@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Haskell Dice of Doom - Part 1 &#8211; Derek McLoughlin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Conrad Barski's Land of Lisp develops a simple board game from chapter 15 onwards, as an example of using functional-style programming in Common Lisp. The game, Dice of Doom, uses a hexagonally-tiled board where two or more players occupy various cells on the board and can attack each other subject to some rules.  In this series we'll rewrite the game using Haskell.">
+    <meta name="author" content="Derek McLoughlin">
+    <meta name="keywords" content="">
+    <link rel="canonical" href="http://derekmcloughlin.github.io/2014/09/13/Haskell-Dice-Of-Doom-Part-1/">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/css/basscss.css" type="text/css">
+    <link rel="stylesheet" href="/css/pixyll.css" type="text/css">
+    <link rel="stylesheet" href="/css/solarized-light.css" type="text/css">
+
+    <!-- Fonts -->
+    <link href='//fonts.googleapis.com/css?family=Merriweather:900,900italic,300,300italic' rel='stylesheet' type='text/css'>
+    <link href='//fonts.googleapis.com/css?family=Lato:900,300' rel='stylesheet' type='text/css'>
+</head>
+
+<body class="">
+  <div class="site-wrap">
+    <header class="site-header px2 px-responsive">
+  <div class="mt2 wrap">
+    <div class="measure">
+      <a href="http://derekmcloughlin.github.io" class="left">Derek McLoughlin</a>
+      <nav class="site-nav right">
+        <a href="/about/">About</a>
+
+      </nav>
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</header>
+
+
+    <div class="post p2 p-responsive wrap" role="main">
+      <div class="measure">
+        <div class="post-header mb2">
+  <h1 class="py2">Haskell Dice of Doom - Part 1</h1>
+  <span class="post-meta">Sep 13, 2014</span>
+</div>
+
+<article class="post-content">
+  <p>Conrad Barski’s <a href="http://landoflisp.com/">Land of Lisp</a> develops a simple 
+board game from chapter 15 onwards, as an example of using 
+functional-style programming in Common Lisp. The game, Dice of Doom, uses a 
+hexagonally-tiled board where two or more players occupy various cells on the board
+and can attack each other subject to some rules.</p>
+
+<p>In this series we’ll rewrite the game using Haskell.</p>
+
+<h2 id="the-original-lisp-game">The Original Lisp Game</h2>
+
+<p>The source code for the Lisp version can be 
+found <a href="http://landoflisp.com/dice_of_doom_v1.lisp">here</a>.</p>
+
+<p>Alternatively use <code>dice_of_doom_v1.lisp</code> that accompanies this source.</p>
+
+<p>Download this file, or use the one with the source code here.</p>
+
+<p>To run it you’ll need a working <a href="http://sourceforge.net/projects/clisp/">CLisp</a> 
+or <a href="http://www.sbcl.org/">SBCL</a> environment. We’ll use CLisp to test the run:</p>
+
+<div class="highlight"><pre><code class="language-lisp" data-lang="lisp"><span class="nv">$</span> <span class="nv">clisp</span>
+<span class="o">...</span>
+<span class="nv">[1]&gt;</span> <span class="p">(</span><span class="nb">load</span> <span class="s">&quot;dice_of_doom_v1.lisp&quot;</span><span class="p">)</span>
+<span class="c1">;; Loading file dice_of_doom_v1.lisp ...</span>
+<span class="c1">;; Loaded file dice_of_doom_v1.lisp</span>
+<span class="no">T</span>
+<span class="nv">[2]&gt;</span> <span class="p">(</span><span class="nv">play-vs-human</span> <span class="p">(</span><span class="nv">game-tree</span> <span class="p">(</span><span class="nv">gen-board</span><span class="p">)</span> <span class="mi">0</span> <span class="mi">0</span> <span class="no">t</span><span class="p">))</span>
+<span class="nv">current-player</span> <span class="nb">=</span> <span class="nv">a</span>
+      <span class="nv">b-2</span> <span class="nv">a-1</span> <span class="nv">a-1</span>
+    <span class="nv">a-2</span> <span class="nv">b-2</span> <span class="nv">a-3</span>
+  <span class="nv">b-3</span> <span class="nv">b-1</span> <span class="nv">b-1</span>
+<span class="nv">choose</span> <span class="nv">your</span> <span class="nv">move:</span>
+<span class="mi">1.</span> <span class="mi">3</span> <span class="nv">-&gt;</span> <span class="mi">7</span>
+<span class="mi">2.</span> <span class="mi">5</span> <span class="nv">-&gt;</span> <span class="mi">8</span>
+<span class="mi">3.</span> <span class="mi">5</span> <span class="nv">-&gt;</span> <span class="mi">4</span></code></pre></div>
+
+<p>(Note: to quit during play, press CTRL-C and then <code>(quit)</code> at the CLisp prompt.)</p>
+
+<p>The above 3x3 board looks like this:</p>
+
+<p><img src="http://localhost:4000/3x3board.png" alt="3x3board" /></p>
+
+<p>The rules of the game are as follows: </p>
+
+<ul>
+  <li>Two players (named A and B) occupy spaces on a hexagonal grid. Each
+hexagon in the grid will have some six-sided dice on it, owned by the
+occupant.</li>
+  <li>During a turn, a player can perform any number of moves, but must
+perform at least one move. If the player cannot move, the game ends.</li>
+  <li>A move consists of attacking a neighboring hexagon owned by the
+opponent. The player must have more dice in her hexagon than the
+neighboring hexagon in order to attack. For now, all attacks will automatically
+lead to a win. In future variants, well actually roll the dice for a
+battle. But for now, the player with more dice just wins automatically.</li>
+  <li>After winning a battle, the losing players dice are removed from the
+board, and all but one of the winning players dice are moved onto the
+newly won hexagon.</li>
+  <li>After a player is finished making her moves, reinforcements are added to
+that players dice armies. Reinforcements to the players occupied hexagons
+are added one die at a time, starting from the upper-left corner, moving
+across and down. The maximum number of dice added as reinforcements
+is one less than the player took from the opponent in her completed turn.</li>
+  <li>When a player can no longer take her turn, the game has ended. The
+player who occupies the most hexagons at this point is the winner. (A tie
+is also possible.)</li>
+</ul>
+
+<p>Play a few rounds to get used to the mechanics.</p>
+
+<p><strong>NOTE</strong>: If you’re playing around with this, don’t set the board size
+to anything bigger than 3. The initial version of the Lisp game is very 
+inefficient and it will hang for a long time.</p>
+
+<h2 id="setting-up-the-data-types-in-haskell">Setting up the Data Types in Haskell</h2>
+
+<p>The Lisp implementation uses integer values to represent the state of the board:</p>
+
+<div class="highlight"><pre><code class="language-lisp" data-lang="lisp"><span class="nv">[2]&gt;</span> <span class="p">(</span><span class="nv">gen-board</span><span class="p">)</span>
+<span class="o">#(</span><span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">0</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">0</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">0</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">0</span> <span class="mi">3</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">3</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">))</span></code></pre></div>
+
+<p>An array (not a list) of tuples is used, mainly for performance reasons. This is
+often done in Haskell for the same reasons - constant-time access to a resource.</p>
+
+<p>The first item in the tuple is the player (0 or 1) owning the cell, and 
+the second item is the number of dice (1, 2 or 3) in that cell.</p>
+
+<p>We <em>could</em> do something similar in Haskell:</p>
+
+<div class="highlight"><pre><code class="language-haskell" data-lang="haskell"><span class="kr">type</span> <span class="kt">Board</span> <span class="ow">=</span> <span class="p">[(</span><span class="kt">Int</span><span class="p">,</span> <span class="kt">Int</span><span class="p">)]</span></code></pre></div>
+
+<p>But this is Haskell, and we should use the type system to our advantage:</p>
+
+<div class="highlight"><pre><code class="language-haskell" data-lang="haskell"><span class="kr">data</span> <span class="kt">Player</span> <span class="ow">=</span> <span class="kt">Player</span> <span class="kt">Int</span>
+              <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Show</span><span class="p">)</span>
+
+<span class="kr">data</span> <span class="kt">Cell</span> <span class="ow">=</span> <span class="kt">Cell</span> <span class="p">{</span>
+                <span class="n">player</span> <span class="ow">::</span> <span class="kt">Player</span><span class="p">,</span>
+                <span class="n">dice</span> <span class="ow">::</span> <span class="kt">Int</span>
+            <span class="p">}</span> 
+            <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Show</span><span class="p">)</span>
+
+<span class="kr">data</span> <span class="kt">Board</span> <span class="ow">=</span> <span class="kt">Board</span> <span class="p">{</span>
+                <span class="n">size</span> <span class="ow">::</span> <span class="kt">Int</span><span class="p">,</span>
+                <span class="n">maxDice</span> <span class="ow">::</span> <span class="kt">Int</span><span class="p">,</span>
+                <span class="n">numPlayers</span> <span class="ow">::</span> <span class="kt">Int</span><span class="p">,</span>
+                <span class="n">cells</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">Cell</span><span class="p">],</span>
+                <span class="n">conqueredDice</span> <span class="ow">::</span> <span class="kt">Int</span>
+             <span class="p">}</span>
+             <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Show</span><span class="p">)</span>
+
+<span class="nf">test2x2Board</span> <span class="ow">::</span> <span class="kt">Board</span>
+<span class="nf">test2x2Board</span> <span class="ow">=</span> <span class="kt">Board</span> <span class="p">{</span>
+    <span class="n">size</span> <span class="ow">=</span> <span class="mi">2</span><span class="p">,</span>
+    <span class="n">maxDice</span> <span class="ow">=</span> <span class="mi">3</span><span class="p">,</span>
+    <span class="n">numPlayers</span> <span class="ow">=</span> <span class="mi">2</span><span class="p">,</span>
+    <span class="n">cells</span> <span class="ow">=</span> <span class="p">[</span>
+          <span class="kt">Cell</span> <span class="p">{</span><span class="n">player</span> <span class="ow">=</span> <span class="kt">Player</span> <span class="mi">1</span><span class="p">,</span> <span class="n">dice</span> <span class="ow">=</span> <span class="mi">2</span><span class="p">}</span>
+        <span class="p">,</span> <span class="kt">Cell</span> <span class="p">{</span><span class="n">player</span> <span class="ow">=</span> <span class="kt">Player</span> <span class="mi">1</span><span class="p">,</span> <span class="n">dice</span> <span class="ow">=</span> <span class="mi">2</span><span class="p">}</span>
+        <span class="p">,</span> <span class="kt">Cell</span> <span class="p">{</span><span class="n">player</span> <span class="ow">=</span> <span class="kt">Player</span> <span class="mi">0</span><span class="p">,</span> <span class="n">dice</span> <span class="ow">=</span> <span class="mi">2</span><span class="p">}</span>
+        <span class="p">,</span> <span class="kt">Cell</span> <span class="p">{</span><span class="n">player</span> <span class="ow">=</span> <span class="kt">Player</span> <span class="mi">1</span><span class="p">,</span> <span class="n">dice</span> <span class="ow">=</span> <span class="mi">1</span><span class="p">}],</span>
+    <span class="n">conqueredDice</span> <span class="ow">=</span> <span class="mi">0</span>
+<span class="p">}</span>
+
+<span class="nf">test3x3Board</span> <span class="ow">::</span> <span class="kt">Board</span>
+<span class="nf">test3x3Board</span> <span class="ow">=</span> <span class="kt">Board</span> <span class="p">{</span>
+    <span class="n">size</span> <span class="ow">=</span> <span class="mi">3</span><span class="p">,</span>
+    <span class="n">maxDice</span> <span class="ow">=</span> <span class="mi">3</span><span class="p">,</span>
+    <span class="n">numPlayers</span> <span class="ow">=</span> <span class="mi">2</span><span class="p">,</span>
+    <span class="n">cells</span> <span class="ow">=</span> <span class="p">[</span>
+          <span class="kt">Cell</span> <span class="p">{</span><span class="n">player</span> <span class="ow">=</span> <span class="kt">Player</span> <span class="mi">0</span><span class="p">,</span> <span class="n">dice</span> <span class="ow">=</span> <span class="mi">1</span><span class="p">}</span>
+        <span class="p">,</span> <span class="kt">Cell</span> <span class="p">{</span><span class="n">player</span> <span class="ow">=</span> <span class="kt">Player</span> <span class="mi">1</span><span class="p">,</span> <span class="n">dice</span> <span class="ow">=</span> <span class="mi">2</span><span class="p">}</span>
+        <span class="p">,</span> <span class="kt">Cell</span> <span class="p">{</span><span class="n">player</span> <span class="ow">=</span> <span class="kt">Player</span> <span class="mi">0</span><span class="p">,</span> <span class="n">dice</span> <span class="ow">=</span> <span class="mi">1</span><span class="p">}</span>
+        <span class="p">,</span> <span class="kt">Cell</span> <span class="p">{</span><span class="n">player</span> <span class="ow">=</span> <span class="kt">Player</span> <span class="mi">1</span><span class="p">,</span> <span class="n">dice</span> <span class="ow">=</span> <span class="mi">1</span><span class="p">}</span>
+        <span class="p">,</span> <span class="kt">Cell</span> <span class="p">{</span><span class="n">player</span> <span class="ow">=</span> <span class="kt">Player</span> <span class="mi">1</span><span class="p">,</span> <span class="n">dice</span> <span class="ow">=</span> <span class="mi">2</span><span class="p">}</span>
+        <span class="p">,</span> <span class="kt">Cell</span> <span class="p">{</span><span class="n">player</span> <span class="ow">=</span> <span class="kt">Player</span> <span class="mi">0</span><span class="p">,</span> <span class="n">dice</span> <span class="ow">=</span> <span class="mi">1</span><span class="p">}</span>
+        <span class="p">,</span> <span class="kt">Cell</span> <span class="p">{</span><span class="n">player</span> <span class="ow">=</span> <span class="kt">Player</span> <span class="mi">0</span><span class="p">,</span> <span class="n">dice</span> <span class="ow">=</span> <span class="mi">1</span><span class="p">}</span>
+        <span class="p">,</span> <span class="kt">Cell</span> <span class="p">{</span><span class="n">player</span> <span class="ow">=</span> <span class="kt">Player</span> <span class="mi">0</span><span class="p">,</span> <span class="n">dice</span> <span class="ow">=</span> <span class="mi">1</span><span class="p">}</span>
+        <span class="p">,</span> <span class="kt">Cell</span> <span class="p">{</span><span class="n">player</span> <span class="ow">=</span> <span class="kt">Player</span> <span class="mi">0</span><span class="p">,</span> <span class="n">dice</span> <span class="ow">=</span> <span class="mi">3</span><span class="p">}],</span>
+    <span class="n">conqueredDice</span> <span class="ow">=</span> <span class="mi">0</span>
+<span class="p">}</span></code></pre></div>
+
+<p>Note that I’m putting more state into the board than the Lisp version - including
+the board dimensions and the number of dice conquered in an attacking move.</p>
+
+<h2 id="generating-a-random-board">Generating a Random Board</h2>
+
+<p>The Lisp code in the book marks out the sections of the code that have 
+a “clean, functional” style vs. those that have a “dirty, imperative” style.</p>
+
+<p>The Lisp code to generate a randomly populated board is not functional, and
+has the “dirty, imperative” icon:</p>
+
+<p><img src="http://localhost:4000/dirty-imperative.png" alt="dirty-imperative" /></p>
+
+<div class="highlight"><pre><code class="language-lisp" data-lang="lisp"><span class="p">(</span><span class="nb">defun</span> <span class="nv">board-list</span> <span class="p">()</span>
+  <span class="p">(</span><span class="nb">loop</span> <span class="nv">for</span> <span class="nv">n</span> <span class="nv">below</span> <span class="vg">*board-hexnum*</span>
+		     <span class="nv">collect</span> <span class="p">(</span><span class="nb">list</span> <span class="p">(</span><span class="nb">random</span> <span class="vg">*num-players*</span><span class="p">)</span>
+				   <span class="p">(</span><span class="nb">1+</span> <span class="p">(</span><span class="nb">random</span> <span class="vg">*max-dice*</span><span class="p">)))))</span></code></pre></div>
+
+<p>Haskell allows us to mark the code directly as “dirty”, “imperative” or “unsafe”. We do 
+this using the IO monad.</p>
+
+<div class="highlight"><pre><code class="language-haskell" data-lang="haskell"><span class="kr">import</span> <span class="nn">System.Random</span> <span class="p">(</span><span class="nf">newStdGen</span><span class="p">,</span> <span class="nf">randomRs</span><span class="p">)</span>
+
+<span class="nf">genBoard</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="kt">Board</span>
+<span class="nf">genBoard</span> <span class="n">boardSize</span> <span class="n">nplayers</span> <span class="n">ndice</span> <span class="ow">=</span> <span class="kr">do</span>
+    <span class="n">diceGen</span> <span class="ow">&lt;-</span> <span class="n">newStdGen</span>
+    <span class="n">playerGen</span> <span class="ow">&lt;-</span> <span class="n">newStdGen</span>
+    <span class="kr">let</span> <span class="n">players</span> <span class="ow">=</span> <span class="n">map</span> <span class="kt">Player</span> <span class="o">$</span> <span class="n">take</span> <span class="n">numCells</span> <span class="o">$</span> <span class="n">randomRs</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">nplayers</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="n">playerGen</span>
+    <span class="kr">let</span> <span class="n">dice_values</span> <span class="ow">=</span> <span class="n">take</span> <span class="n">numCells</span> <span class="o">$</span> <span class="n">randomRs</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">ndice</span><span class="p">)</span> <span class="n">diceGen</span>
+    <span class="n">return</span> <span class="kt">Board</span> <span class="p">{</span> 
+        <span class="n">size</span> <span class="ow">=</span> <span class="n">boardSize</span><span class="p">,</span>
+        <span class="n">maxDice</span> <span class="ow">=</span> <span class="n">ndice</span><span class="p">,</span>
+        <span class="n">numPlayers</span> <span class="ow">=</span> <span class="n">nplayers</span><span class="p">,</span>
+        <span class="n">cells</span> <span class="ow">=</span> <span class="p">[</span><span class="kt">Cell</span> <span class="p">{</span><span class="n">player</span> <span class="ow">=</span> <span class="n">p</span><span class="p">,</span> <span class="n">dice</span> <span class="ow">=</span> <span class="n">n</span><span class="p">}</span> <span class="o">|</span> <span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span> <span class="ow">&lt;-</span> <span class="n">zip</span> <span class="n">players</span> <span class="n">dice_values</span><span class="p">],</span>
+        <span class="n">conqueredDice</span> <span class="ow">=</span> <span class="mi">0</span>
+    <span class="p">}</span>
+    <span class="kr">where</span> 
+        <span class="n">numCells</span> <span class="ow">=</span> <span class="n">boardSize</span> <span class="o">*</span> <span class="n">boardSize</span></code></pre></div>
+
+<p>Code is in DiceOfDoom-a.hs</p>
+
+<p>Note: unlike the original code, the board size, number of players and number of dice are
+passsed in as parameters. </p>
+
+<p>We can test this in the repl:</p>
+
+<div class="highlight"><pre><code class="language-haskell" data-lang="haskell"><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">l</span> <span class="n">dice</span><span class="o">-</span><span class="kr">of</span><span class="o">-</span><span class="n">doom</span><span class="o">.</span><span class="n">hs</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">board</span> <span class="ow">&lt;-</span> <span class="n">genBoard</span> <span class="mi">3</span> <span class="mi">2</span> <span class="mi">3</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">board</span>
+<span class="kt">Board</span> <span class="p">{</span>
+    <span class="n">size</span> <span class="ow">=</span> <span class="mi">3</span><span class="p">,</span> 
+    <span class="n">maxDice</span> <span class="ow">=</span> <span class="mi">3</span><span class="p">,</span> 
+    <span class="n">numPlayers</span> <span class="ow">=</span> <span class="mi">2</span><span class="p">,</span> 
+    <span class="n">cells</span> <span class="ow">=</span> <span class="p">[</span>
+        <span class="kt">Cell</span> <span class="p">{</span><span class="n">player</span> <span class="ow">=</span> <span class="kt">Player</span> <span class="mi">0</span><span class="p">,</span> <span class="n">dice</span> <span class="ow">=</span> <span class="mi">1</span><span class="p">},</span>
+        <span class="kt">Cell</span> <span class="p">{</span><span class="n">player</span> <span class="ow">=</span> <span class="kt">Player</span> <span class="mi">0</span><span class="p">,</span> <span class="n">dice</span> <span class="ow">=</span> <span class="mi">3</span><span class="p">},</span>
+        <span class="kt">Cell</span> <span class="p">{</span><span class="n">player</span> <span class="ow">=</span> <span class="kt">Player</span> <span class="mi">0</span><span class="p">,</span> <span class="n">dice</span> <span class="ow">=</span> <span class="mi">3</span><span class="p">},</span>
+        <span class="kt">Cell</span> <span class="p">{</span><span class="n">player</span> <span class="ow">=</span> <span class="kt">Player</span> <span class="mi">1</span><span class="p">,</span> <span class="n">dice</span> <span class="ow">=</span> <span class="mi">1</span><span class="p">},</span>
+        <span class="kt">Cell</span> <span class="p">{</span><span class="n">player</span> <span class="ow">=</span> <span class="kt">Player</span> <span class="mi">0</span><span class="p">,</span> <span class="n">dice</span> <span class="ow">=</span> <span class="mi">1</span><span class="p">},</span>
+        <span class="kt">Cell</span> <span class="p">{</span><span class="n">player</span> <span class="ow">=</span> <span class="kt">Player</span> <span class="mi">1</span><span class="p">,</span> <span class="n">dice</span> <span class="ow">=</span> <span class="mi">3</span><span class="p">},</span>
+        <span class="kt">Cell</span> <span class="p">{</span><span class="n">player</span> <span class="ow">=</span> <span class="kt">Player</span> <span class="mi">1</span><span class="p">,</span> <span class="n">dice</span> <span class="ow">=</span> <span class="mi">3</span><span class="p">},</span>
+        <span class="kt">Cell</span> <span class="p">{</span><span class="n">player</span> <span class="ow">=</span> <span class="kt">Player</span> <span class="mi">1</span><span class="p">,</span> <span class="n">dice</span> <span class="ow">=</span> <span class="mi">3</span><span class="p">},</span>
+        <span class="kt">Cell</span> <span class="p">{</span><span class="n">player</span> <span class="ow">=</span> <span class="kt">Player</span> <span class="mi">1</span><span class="p">,</span> <span class="n">dice</span> <span class="ow">=</span> <span class="mi">2</span><span class="p">}</span>
+    <span class="p">],</span>
+    <span class="n">conqueredDice</span> <span class="ow">=</span> <span class="mi">0</span>
+<span class="p">}</span></code></pre></div>
+
+<h2 id="drawing-the-board">Drawing The Board</h2>
+<hr />
+
+<p>The data types given so far use the default implementation of the <code>Show</code> typeclass. 
+We’ll change that now to represent the board in the same way as the Lisp code.</p>
+
+<p>Drawing the board is another “unsafe” function, but I’ll split it into 
+two functions: one does the IO, the other generates a string representation of the board.</p>
+
+<p>First we’ll remove the default implementation of the <code>Show</code> typeclass for Player and Cell
+and replace them with a custom version:</p>
+
+<div class="highlight"><pre><code class="language-haskell" data-lang="haskell"><span class="kr">import</span> <span class="nn">Data.List</span> <span class="p">(</span><span class="nf">chr</span><span class="p">,</span> <span class="nf">ord</span><span class="p">)</span>
+<span class="kr">data</span> <span class="kt">Player</span> <span class="ow">=</span> <span class="kt">Player</span> <span class="kt">Int</span>
+
+<span class="kr">instance</span> <span class="kt">Show</span> <span class="kt">Player</span> <span class="kr">where</span>
+    <span class="n">show</span> <span class="p">(</span><span class="kt">Player</span> <span class="n">i</span><span class="p">)</span> <span class="ow">=</span> <span class="p">[</span><span class="n">chr</span> <span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="n">ord</span> <span class="n">&#39;a&#39;</span><span class="p">)]</span>
+
+<span class="kr">data</span> <span class="kt">Cell</span> <span class="ow">=</span> <span class="kt">Cell</span> <span class="p">{</span>
+                <span class="n">player</span> <span class="ow">::</span> <span class="kt">Player</span><span class="p">,</span>
+                <span class="n">dice</span> <span class="ow">::</span> <span class="kt">Int</span>
+            <span class="p">}</span> 
+
+<span class="kr">instance</span> <span class="kt">Show</span> <span class="kt">Cell</span> <span class="kr">where</span>
+    <span class="n">show</span> <span class="n">c</span> <span class="ow">=</span> <span class="n">show</span> <span class="p">(</span><span class="n">player</span> <span class="n">c</span><span class="p">)</span> <span class="o">++</span> <span class="s">&quot;-&quot;</span> <span class="o">++</span> <span class="n">show</span> <span class="p">(</span><span class="n">dice</span> <span class="n">c</span><span class="p">)</span></code></pre></div>
+
+<p>As in the Lisp version, player 0 is denoted by ‘a’, player 1 by ‘b’ etc.</p>
+
+<p>This now gives us:</p>
+
+<div class="highlight"><pre><code class="language-haskell" data-lang="haskell"><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">test3x3board</span>
+<span class="kt">Board</span> <span class="p">{</span>
+    <span class="n">size</span> <span class="ow">=</span> <span class="mi">3</span><span class="p">,</span> 
+    <span class="n">maxDice</span> <span class="ow">=</span> <span class="mi">3</span><span class="p">,</span> 
+    <span class="n">numPlayers</span> <span class="ow">=</span> <span class="mi">2</span><span class="p">,</span> 
+    <span class="n">cells</span> <span class="ow">=</span> <span class="p">[</span><span class="n">a</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="n">b</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="n">a</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="n">b</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="n">b</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="n">a</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="n">a</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="n">a</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="n">a</span><span class="o">-</span><span class="mi">3</span><span class="p">],</span> 
+    <span class="n">conqueredDice</span> <span class="ow">=</span> <span class="mi">0</span>
+<span class="p">}</span></code></pre></div>
+
+<p>To get the exact same as the Lisp program output, we define <code>showBoard</code> for the string
+representation and <code>drawBoard</code> as the bit that does IO:</p>
+
+<div class="highlight"><pre><code class="language-haskell" data-lang="haskell"><span class="nf">drawBoard</span> <span class="ow">::</span> <span class="kt">Board</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>    
+<span class="nf">drawBoard</span> <span class="n">b</span> <span class="ow">=</span> <span class="n">putStrLn</span> <span class="o">$</span> <span class="n">showBoard</span> <span class="n">b</span>
+
+<span class="nf">showBoard</span> <span class="ow">::</span> <span class="kt">Board</span> <span class="ow">-&gt;</span> <span class="kt">String</span>
+<span class="nf">showBoard</span> <span class="n">b</span> <span class="ow">=</span> <span class="n">concatMap</span> <span class="n">showRow</span> <span class="o">$</span> <span class="n">zip</span> <span class="n">rowNumbers</span> <span class="n">rows</span> 
+    <span class="kr">where</span> 
+        <span class="n">showRow</span> <span class="p">(</span><span class="n">rowNo</span><span class="p">,</span> <span class="n">rowCells</span><span class="p">)</span> <span class="ow">=</span> <span class="n">indent</span> <span class="n">rowNo</span> <span class="o">++</span> <span class="n">showCells</span> <span class="n">rowCells</span>
+        <span class="n">indent</span> <span class="n">lineno</span> <span class="ow">=</span> <span class="n">concat</span> <span class="o">$</span> <span class="n">replicate</span> <span class="n">lineno</span> <span class="s">&quot;  &quot;</span>
+        <span class="n">showCells</span> <span class="n">cs</span> <span class="ow">=</span> <span class="n">unwords</span> <span class="p">(</span><span class="n">map</span> <span class="n">show</span> <span class="n">cs</span><span class="p">)</span> <span class="o">++</span> <span class="s">&quot;</span><span class="se">\n</span><span class="s">&quot;</span>
+        <span class="n">boardSize</span> <span class="ow">=</span> <span class="n">size</span> <span class="n">b</span>
+        <span class="n">rowNumbers</span> <span class="ow">=</span> <span class="p">[</span><span class="n">boardSize</span><span class="p">,</span> <span class="n">boardSize</span> <span class="o">-</span><span class="mi">1</span> <span class="o">..</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="n">rows</span> <span class="ow">=</span> <span class="n">chunksOf</span> <span class="n">boardSize</span> <span class="p">(</span><span class="n">cells</span> <span class="n">b</span><span class="p">)</span></code></pre></div>
+
+<p>We break down the list of cells into rows, number the rows (starting at the highest number
+and working down to 1), zip these together to form a tuple of (row number, cells in row), 
+then indent depending on the row number (highest numbered rows are indented more) and 
+concatentate the cells on each row together.</p>
+
+<p>Testing this we have:</p>
+
+<div class="highlight"><pre><code class="language-haskell" data-lang="haskell"><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">drawBoard</span> <span class="n">test3x3board</span>
+      <span class="n">a</span><span class="o">-</span><span class="mi">1</span> <span class="n">b</span><span class="o">-</span><span class="mi">2</span> <span class="n">a</span><span class="o">-</span><span class="mi">1</span>
+    <span class="n">b</span><span class="o">-</span><span class="mi">1</span> <span class="n">b</span><span class="o">-</span><span class="mi">2</span> <span class="n">a</span><span class="o">-</span><span class="mi">1</span>
+  <span class="n">a</span><span class="o">-</span><span class="mi">1</span> <span class="n">a</span><span class="o">-</span><span class="mi">1</span> <span class="n">a</span><span class="o">-</span><span class="mi">3</span></code></pre></div>
+
+<p>Code is in DiceOfDoom-b.hs</p>
+
+<h2 id="generating-a-game-tree">Generating a Game Tree</h2>
+
+<p>A game tree is a tree of all possible moves from an intial board configuration.</p>
+
+<p>As an example, consider the example game on page 321. I’ve added the
+2x2 board configuration used on that page as a new parameter in the Lisp code:</p>
+
+<div class="highlight"><pre><code class="language-lisp" data-lang="lisp"><span class="p">(</span><span class="nb">defparameter</span> <span class="vg">*test-board*</span> <span class="o">#(</span><span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">0</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)))</span></code></pre></div>
+
+<p>(Note: this is the same as the <code>test2x2Board</code> in the Haskell source.</p>
+
+<p>You can play out this game in CLisp:</p>
+
+<div class="highlight"><pre><code class="language-lisp" data-lang="lisp"><span class="nv">[1]&gt;</span> <span class="p">(</span><span class="nb">load</span> <span class="s">&quot;dice_of_doom_v1.lisp&quot;</span><span class="p">)</span>
+<span class="c1">;; Loading file dice_of_doom_v1.lisp ...</span>
+<span class="c1">;; Loaded file dice_of_doom_v1.lisp</span>
+<span class="no">T</span>
+<span class="nv">[2]&gt;</span> <span class="p">(</span><span class="nv">play-vs-human</span> <span class="p">(</span><span class="nv">game-tree</span> <span class="vg">*test-board*</span> <span class="mi">0</span> <span class="mi">0</span> <span class="no">t</span><span class="p">))</span>
+<span class="nv">current</span> <span class="nv">player</span> <span class="nb">=</span> <span class="nv">a</span>
+<span class="nv">b-2</span> <span class="nv">b-2</span>
+<span class="nv">a-2</span> <span class="nv">b-1</span>
+<span class="nv">choose</span> <span class="nv">your</span> <span class="nv">move:</span>
+<span class="mi">1.</span> <span class="mi">2</span> <span class="nv">-&gt;</span> <span class="mi">3</span></code></pre></div>
+
+<p>We’re interested in the game tree, as produced by the <code>game-tree</code> function. Let’s take
+a look at what it produces:</p>
+
+<div class="highlight"><pre><code class="language-lisp" data-lang="lisp"><span class="nv">[1]&gt;</span> <span class="p">(</span><span class="nb">load</span> <span class="s">&quot;dice_of_doom_v1.lisp&quot;</span><span class="p">)</span>
+<span class="c1">;; Loading file dice_of_doom_v1.lisp ...</span>
+<span class="c1">;; Loaded file dice_of_doom_v1.lisp</span>
+<span class="no">T</span>
+<span class="nv">[2]&gt;</span> <span class="p">(</span><span class="nv">game-tree</span> <span class="vg">*test-board*</span> <span class="mi">0</span> <span class="mi">0</span> <span class="no">t</span><span class="p">))</span>
+<span class="p">(</span><span class="mi">0</span> <span class="o">#(</span><span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">0</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">))</span>
+ <span class="p">(((</span><span class="mi">2</span> <span class="mi">3</span><span class="p">)</span>
+   <span class="p">(</span><span class="mi">0</span> <span class="o">#(</span><span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">0</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">0</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="p">((</span><span class="no">NIL</span>
+      <span class="p">(</span><span class="mi">1</span> <span class="o">#(</span><span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">0</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">0</span> <span class="mi">1</span><span class="p">))</span>
+       <span class="p">(((</span><span class="mi">0</span> <span class="mi">2</span><span class="p">)</span>
+         <span class="p">(</span><span class="mi">1</span> <span class="o">#(</span><span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">0</span> <span class="mi">1</span><span class="p">))</span>
+          <span class="p">((</span><span class="no">NIL</span> <span class="p">(</span><span class="mi">0</span> <span class="o">#(</span><span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">0</span> <span class="mi">1</span><span class="p">))</span> <span class="no">NIL</span><span class="p">))</span>
+           <span class="p">((</span><span class="mi">1</span> <span class="mi">3</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="o">#(</span><span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">))</span> <span class="p">((</span><span class="no">NIL</span> <span class="p">(</span><span class="mi">0</span> <span class="o">#(</span><span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">))</span> <span class="no">NIL</span><span class="p">))))))))</span>
+        <span class="p">((</span><span class="mi">0</span> <span class="mi">3</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="o">#(</span><span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">0</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">))</span> <span class="p">((</span><span class="no">NIL</span> <span class="p">(</span><span class="mi">0</span> <span class="o">#(</span><span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">0</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">))</span> <span class="no">NIL</span><span class="p">)))))</span>
+        <span class="p">((</span><span class="mi">1</span> <span class="mi">3</span><span class="p">)</span>
+         <span class="p">(</span><span class="mi">1</span> <span class="o">#(</span><span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">0</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">))</span>
+          <span class="p">((</span><span class="no">NIL</span> <span class="p">(</span><span class="mi">0</span> <span class="o">#(</span><span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">0</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">))</span> <span class="no">NIL</span><span class="p">))</span>
+           <span class="p">((</span><span class="mi">0</span> <span class="mi">2</span><span class="p">)</span>
+            <span class="p">(</span><span class="mi">1</span> <span class="o">#(</span><span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">))</span> <span class="p">((</span><span class="no">NIL</span> <span class="p">(</span><span class="mi">0</span> <span class="o">#(</span><span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">))</span> <span class="no">NIL</span><span class="p">))))))))))))))))</span>
+<span class="o">...</span></code></pre></div>
+
+<p>Ignore the errors and just look at the output. Whoa!</p>
+
+<p>Each node in the game tree contains the current player (0 or 1), the current board state and a 
+list of possible moves. Each move leads to another node on the tree.</p>
+
+<p>The above can be summarised as follows, where we show players A and B:</p>
+
+<div class="highlight"><pre><code class="language-lisp" data-lang="lisp"><span class="nv">A</span> <span class="o">#(</span><span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">0</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">))</span>
+<span class="nv">|   A Moves 2 -&gt; 3</span>
+<span class="nv">+----&gt;  A #((1 2) (1 2) (0 1) (0 1))</span>
+<span class="nv">     |</span>      <span class="nv">No</span> <span class="nv">A</span> <span class="nv">Moves</span> <span class="nv">Possible</span> <span class="nb">-</span> <span class="nv">B</span><span class="ss">&#39;s</span> <span class="nv">Turn</span>
+     <span class="nv">+---&gt;</span>  <span class="nv">B</span> <span class="o">#(</span><span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">0</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">0</span> <span class="mi">1</span><span class="p">))</span>
+         <span class="nv">|      B Moves 0 -&gt; 2</span>
+<span class="nv">         +-------&gt;  B #((1 1) (1 2) (1 1) (0 1))</span>
+<span class="nv">         |</span>       <span class="nv">|  B Ends - A&#39;s Turn</span>
+<span class="nv">         |</span>       <span class="nv">+---&gt;</span>  <span class="nv">A</span> <span class="o">#(</span><span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">0</span> <span class="mi">1</span><span class="p">))</span> 
+         <span class="nv">|       |</span>          <span class="nv">No</span> <span class="nv">A</span> <span class="nv">Moves</span> <span class="nv">Possible</span> <span class="nb">-</span> <span class="nv">GAME</span> <span class="nv">ENDS</span> <span class="nb">-</span> <span class="nv">B</span> <span class="nv">wins</span>
+         <span class="nv">|       |</span>  <span class="nv">B</span> <span class="nv">Moves</span> <span class="mi">1</span> <span class="nv">-&gt;</span> <span class="mi">3</span> 
+         <span class="nv">|       +---&gt;  B #((1 1) (1 1) (1 1) (1 1)) </span>
+<span class="nv">         |</span>           <span class="nv">|      No B Moves Possible - A&#39;s Turn</span>
+<span class="nv">         |</span>           <span class="nv">+---&gt;</span>  <span class="nv">A</span> <span class="o">#(</span><span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">))</span>
+         <span class="nv">|                      No A Moves Possible - GAME ENDS - B wins</span>
+<span class="nv">         |</span>      <span class="nv">B</span> <span class="nv">Moves</span> <span class="mi">0</span> <span class="nv">-&gt;</span> <span class="mi">3</span> 
+         <span class="nv">+-------&gt;</span>  <span class="nv">B</span> <span class="o">#(</span><span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">0</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">))</span> 
+         <span class="nv">|       |</span>      <span class="nv">No</span> <span class="nv">B</span> <span class="nv">Moves</span> <span class="nv">Possible</span>
+         <span class="nv">|       +---&gt;  A #((1 1) (1 2) (0 1) (1 1))</span>
+<span class="nv">         |</span>                  <span class="nv">No</span> <span class="nv">A</span> <span class="nv">Moves</span> <span class="nv">Possible</span> <span class="nb">-</span> <span class="nv">GAME</span> <span class="nv">ENDS</span> <span class="nb">-</span> <span class="nv">B</span> <span class="nv">wins</span>
+         <span class="nv">|      B Moves 1 -&gt; 3</span>
+<span class="nv">         +-------&gt;  B #((1 2) (1 1) (0 1) (1 1))</span>
+<span class="nv">                 |</span>  <span class="nv">B</span> <span class="nv">Ends</span> <span class="nb">-</span> <span class="nv">A</span><span class="ss">&#39;s</span> <span class="nv">Turn</span>
+                 <span class="nv">+---&gt;</span>  <span class="nv">A</span> <span class="o">#(</span><span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">0</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">))</span>
+                 <span class="nv">|          No A Moves Possible - GAME ENDS - B wins</span>
+<span class="nv">                 |</span>  <span class="nv">B</span> <span class="nv">Moves</span> <span class="mi">0</span> <span class="nv">-&gt;</span> <span class="mi">2</span>
+                 <span class="nv">+---&gt;</span>  <span class="nv">B</span> <span class="o">#(</span><span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">))</span> 
+                     <span class="err">|</span>      <span class="nv">No</span> <span class="nv">B</span> <span class="nv">Moves</span> <span class="nv">Possible</span> <span class="nb">-</span> <span class="nv">A</span><span class="ss">&#39;s</span> <span class="nv">Turn</span>
+                     <span class="nv">+---&gt;</span>  <span class="nv">A</span> <span class="o">#(</span><span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">))</span>
+                                <span class="nv">No</span> <span class="nv">A</span> <span class="nv">Moves</span> <span class="nv">Possible</span> <span class="nb">-</span> <span class="nv">GAME</span> <span class="nv">ENDS</span> <span class="nb">-</span> <span class="nv">B</span> <span class="nv">wins</span></code></pre></div>
+
+<p>It’s better to see it in a diagram:</p>
+
+<p><img src="http://localhost:4000/game_tree.png" alt="gametree" /></p>
+
+<p>Compare this with the game tree for the same board but with B playing first:</p>
+
+<div class="highlight"><pre><code class="language-lisp" data-lang="lisp"><span class="nv">[2]&gt;</span> <span class="p">(</span><span class="nv">game-tree</span> <span class="vg">*test-board*</span> <span class="mi">1</span> <span class="mi">0</span> <span class="no">t</span><span class="p">))</span>
+<span class="p">(</span><span class="mi">1</span> <span class="o">#(</span><span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">0</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="mi">1</span> <span class="mi">1</span><span class="p">))</span> <span class="no">NIL</span><span class="p">)</span></code></pre></div>
+
+<p>If B plays first, there are no moves possible and the game ends with B
+the winner.</p>
+
+<p>The code do to this is split over a few functions:</p>
+
+<ul>
+  <li>game-tree</li>
+  <li>add-passing-move </li>
+  <li>attacking-moves</li>
+</ul>
+
+<p>The last two functions recurse back to the first.</p>
+
+<h2 id="calculating-attacking-moves">Calculating Attacking Moves</h2>
+
+<p>Let’s look at the <code>attacking-moves</code> function. Given a board and a player, finding out the
+list of attacking moves involves finding all the cells for that player and for each
+cell finding the list of attacking moves to the opposition’s cells that are in the
+neighbourhood of the player.</p>
+
+<p>The neighbours of a cell can be determined as follows:</p>
+
+<div class="highlight"><pre><code class="language-haskell" data-lang="haskell"><span class="nf">neighbours</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">Int</span><span class="p">]</span>
+<span class="nf">neighbours</span> <span class="n">board_size</span> <span class="n">pos</span> <span class="ow">=</span> 
+    <span class="p">[</span><span class="n">p</span> <span class="o">|</span> <span class="n">p</span> <span class="ow">&lt;-</span> <span class="n">possibleNeighbours</span><span class="p">,</span> <span class="n">p</span> <span class="o">&gt;=</span> <span class="mi">0</span> <span class="o">&amp;&amp;</span> <span class="n">p</span> <span class="o">&lt;</span> <span class="p">(</span><span class="n">board_size</span> <span class="o">*</span> <span class="n">board_size</span><span class="p">)]</span>
+    <span class="kr">where</span> 
+        <span class="n">up</span>    <span class="ow">=</span> <span class="n">pos</span> <span class="o">-</span> <span class="n">board_size</span>
+        <span class="n">down</span>  <span class="ow">=</span> <span class="n">pos</span> <span class="o">+</span> <span class="n">board_size</span>
+        <span class="n">possibleNeighbours</span> <span class="ow">=</span> <span class="p">[</span><span class="n">up</span><span class="p">,</span> <span class="n">down</span><span class="p">]</span> 
+             <span class="o">++</span> <span class="p">(</span><span class="kr">if</span> <span class="n">pos</span> <span class="p">`</span><span class="n">mod</span><span class="p">`</span> <span class="n">board_size</span> <span class="o">==</span> <span class="mi">0</span>
+                    <span class="kr">then</span>    <span class="kt">[]</span>
+                    <span class="kr">else</span>    <span class="p">[</span><span class="n">up</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">pos</span> <span class="o">-</span> <span class="mi">1</span><span class="p">])</span>
+             <span class="o">++</span> <span class="p">(</span><span class="kr">if</span> <span class="p">(</span><span class="n">pos</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="p">`</span><span class="n">mod</span><span class="p">`</span> <span class="n">board_size</span> <span class="o">==</span> <span class="mi">0</span>
+                    <span class="kr">then</span>    <span class="kt">[]</span>
+                    <span class="kr">else</span>    <span class="p">[</span><span class="n">pos</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">down</span> <span class="o">+</span> <span class="mi">1</span><span class="p">])</span></code></pre></div>
+
+<p>Trying this out we have:</p>
+
+<div class="highlight"><pre><code class="language-haskell" data-lang="haskell"><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">l</span> <span class="kt">DiceOfDoom</span><span class="o">-</span><span class="n">c</span><span class="o">.</span><span class="n">hs</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">neighbours</span> <span class="mi">3</span> <span class="mi">4</span>
+<span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">7</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="mi">8</span><span class="p">]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">neighbours</span> <span class="mi">3</span> <span class="mi">0</span>
+<span class="p">[</span><span class="mi">3</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">4</span><span class="p">]</span></code></pre></div>
+
+<p>Note that the Lisp code deals with positions of cells in the array. We’ll 
+use that for the moment as well, but might change it later.</p>
+
+<p>It’s useful to map the positions of cells with the actual cells. From that we
+can find the cell positions for a player:</p>
+
+<div class="highlight"><pre><code class="language-haskell" data-lang="haskell"><span class="c1">-- Get a list of board positions and cells</span>
+<span class="nf">cellPositions</span> <span class="ow">::</span> <span class="kt">Board</span> <span class="ow">-&gt;</span> <span class="p">[(</span><span class="kt">Int</span><span class="p">,</span> <span class="kt">Cell</span><span class="p">)]</span>
+<span class="nf">cellPositions</span> <span class="n">b</span> <span class="ow">=</span> <span class="n">zip</span> <span class="p">[</span><span class="mi">0</span><span class="o">..</span><span class="p">]</span> <span class="p">(</span><span class="n">cells</span> <span class="n">b</span><span class="p">)</span>
+
+<span class="c1">-- Find all a player&#39;s cells on a board</span>
+<span class="nf">playerPositions</span> <span class="ow">::</span> <span class="kt">Board</span> <span class="ow">-&gt;</span> <span class="kt">Player</span> <span class="ow">-&gt;</span> <span class="p">[(</span><span class="kt">Int</span><span class="p">,</span> <span class="kt">Cell</span><span class="p">)]</span>
+<span class="nf">playerPositions</span> <span class="n">b</span> <span class="n">p</span> <span class="ow">=</span> <span class="n">filter</span> <span class="p">(</span><span class="nf">\</span><span class="p">(</span><span class="kr">_</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">player</span> <span class="n">c</span> <span class="o">==</span> <span class="n">p</span><span class="p">)</span> <span class="p">(</span><span class="n">cellPositions</span> <span class="n">b</span><span class="p">)</span></code></pre></div>
+
+<p>We’ll need a function to see if one cell can attack another:</p>
+
+<div class="highlight"><pre><code class="language-haskell" data-lang="haskell"><span class="c1">-- Using cells</span>
+<span class="nf">canCellAttack</span> <span class="ow">::</span> <span class="kt">Cell</span> <span class="ow">-&gt;</span> <span class="kt">Cell</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+<span class="nf">canCellAttack</span> <span class="n">cell1</span> <span class="n">cell2</span> <span class="ow">=</span> <span class="n">player</span> <span class="n">cell1</span> <span class="o">/=</span> <span class="n">player</span> <span class="n">cell2</span> <span class="o">&amp;&amp;</span> <span class="n">dice</span> <span class="n">cell1</span> <span class="o">&gt;</span> <span class="n">dice</span> <span class="n">cell2</span>
+
+<span class="c1">-- Using a board and cell positions</span>
+<span class="nf">canAttack</span> <span class="ow">::</span> <span class="kt">Board</span> <span class="ow">-&gt;</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+<span class="nf">canAttack</span> <span class="n">b</span> <span class="n">pos1</span> <span class="n">pos2</span> <span class="ow">=</span> <span class="n">canCellAttack</span> <span class="n">cell1</span> <span class="n">cell2</span>
+    <span class="kr">where</span> 
+        <span class="n">cell1</span> <span class="ow">=</span> <span class="n">cells</span> <span class="n">b</span> <span class="o">!!</span> <span class="n">pos1</span>
+        <span class="n">cell2</span> <span class="ow">=</span> <span class="n">cells</span> <span class="n">b</span> <span class="o">!!</span> <span class="n">pos2</span></code></pre></div>
+
+<p>Putting this altogether, we have a function to get all the possible attack 
+moves for a player on a particular board:</p>
+
+<div class="highlight"><pre><code class="language-haskell" data-lang="haskell"><span class="nf">attackMoves</span> <span class="ow">::</span> <span class="kt">Board</span> <span class="ow">-&gt;</span> <span class="kt">Player</span> <span class="ow">-&gt;</span> <span class="p">[(</span><span class="kt">Int</span><span class="p">,</span> <span class="kt">Int</span><span class="p">)]</span>
+<span class="nf">attackMoves</span> <span class="n">b</span> <span class="n">p</span> <span class="ow">=</span> <span class="p">[(</span><span class="n">pos</span><span class="p">,</span> <span class="n">neigh</span><span class="p">)</span> <span class="o">|</span> 
+                        <span class="n">pos</span> <span class="ow">&lt;-</span> <span class="n">playerCells</span> <span class="n">b</span> <span class="n">p</span><span class="p">,</span>
+                        <span class="n">neigh</span> <span class="ow">&lt;-</span> <span class="n">neighbours</span> <span class="p">(</span><span class="n">size</span> <span class="n">b</span><span class="p">)</span> <span class="n">pos</span><span class="p">,</span> 
+                        <span class="n">canAttack</span> <span class="n">b</span> <span class="n">pos</span> <span class="n">neigh</span><span class="p">]</span></code></pre></div>
+
+<p>Trying it all out:</p>
+
+<div class="highlight"><pre><code class="language-haskell" data-lang="haskell"><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">l</span> <span class="kt">DiceOfDoom</span><span class="o">-</span><span class="n">c</span><span class="o">.</span><span class="n">hs</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">attackMoves</span> <span class="n">test2x2Board</span> <span class="p">(</span><span class="kt">Player</span> <span class="mi">0</span><span class="p">)</span>
+<span class="p">[(</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">)]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">attackMoves</span> <span class="n">test2x2Board</span> <span class="p">(</span><span class="kt">Player</span> <span class="mi">1</span><span class="p">)</span>
+<span class="kt">[]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">attackMoves</span> <span class="n">test3x3Board</span> <span class="p">(</span><span class="kt">Player</span> <span class="mi">0</span><span class="p">)</span>
+<span class="p">[(</span><span class="mi">8</span><span class="p">,</span><span class="mi">4</span><span class="p">)]</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">attackMoves</span> <span class="n">test3x3Board</span> <span class="p">(</span><span class="kt">Player</span> <span class="mi">1</span><span class="p">)</span>
+<span class="p">[(</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">),(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">),(</span><span class="mi">1</span><span class="p">,</span><span class="mi">5</span><span class="p">),(</span><span class="mi">4</span><span class="p">,</span><span class="mi">7</span><span class="p">),(</span><span class="mi">4</span><span class="p">,</span><span class="mi">0</span><span class="p">),(</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">)]</span></code></pre></div>
+
+<p>Code in DiceOfDoom-c.hs.</p>
+
+<h3 id="attacking">Attacking</h3>
+
+<p>When an attack is made, the state of the board changes, so we’ll need to write a function
+that returns this new state. </p>
+
+<p>The Lisp code for this is <code>board-attack</code>. It constructs a new board from the old board
+looping through the cells and seeing if one is being attacked or is the attacker. The 
+Haskell version is similar:</p>
+
+<div class="highlight"><pre><code class="language-haskell" data-lang="haskell"><span class="nf">attack</span> <span class="ow">::</span> <span class="kt">Board</span> <span class="ow">-&gt;</span> <span class="kt">Player</span> <span class="ow">-&gt;</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Board</span>
+<span class="nf">attack</span> <span class="n">board</span> <span class="n">p</span> <span class="n">src</span> <span class="n">dest</span>
+    <span class="o">|</span> <span class="n">canAttack</span> <span class="n">board</span> <span class="n">src</span> <span class="n">dest</span>  <span class="ow">=</span> <span class="n">board</span> <span class="p">{</span><span class="n">cells</span> <span class="ow">=</span> <span class="p">[</span><span class="n">afterAttack</span> <span class="p">(</span><span class="n">pos</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span> <span class="o">|</span> <span class="p">(</span><span class="n">pos</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span> <span class="ow">&lt;-</span> <span class="n">cellPositions</span> <span class="n">board</span><span class="p">]}</span>
+    <span class="o">|</span> <span class="n">otherwise</span>                 <span class="ow">=</span> <span class="n">board</span>
+    <span class="kr">where</span>
+        <span class="n">srcDice</span> <span class="ow">=</span> <span class="n">dice</span> <span class="p">(</span><span class="n">cells</span> <span class="n">board</span><span class="o">!!</span> <span class="n">src</span><span class="p">)</span>
+        <span class="n">afterAttack</span> <span class="p">(</span><span class="n">pos</span><span class="p">,</span> <span class="n">cell</span><span class="p">)</span>
+            <span class="o">|</span> <span class="n">pos</span> <span class="o">==</span> <span class="n">src</span>  <span class="ow">=</span> <span class="n">cell</span> <span class="p">{</span> <span class="n">dice</span> <span class="ow">=</span> <span class="mi">1</span><span class="p">}</span>                        <span class="c1">-- Attacker cell is just left with 1 die</span>
+            <span class="o">|</span> <span class="n">pos</span> <span class="o">==</span> <span class="n">dest</span> <span class="ow">=</span> <span class="n">cell</span> <span class="p">{</span> <span class="n">dice</span> <span class="ow">=</span> <span class="n">srcDice</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">player</span> <span class="ow">=</span> <span class="n">p</span><span class="p">}</span>  <span class="c1">-- Defender cell switches players and gets remaining dice</span>
+            <span class="o">|</span> <span class="n">otherwise</span>   <span class="ow">=</span> <span class="n">cell</span>                                    <span class="c1">-- Not involved in the attack</span></code></pre></div>
+
+<h3 id="reinforcements">Reinforcements</h3>
+
+<p>After a player’s completed turn, which might include several attacks, reinforcements 
+are added by dividing the conquered dice among the player’s cells, starting from the 
+top and moving from left to right.</p>
+
+<p>Note: The Lisp function is <code>add-new-dice</code> and is the tail-call optimised one introduced
+later in Chapter 15.</p>
+
+<p>Just like the Lisp function, we use a local function to recurse through the board cells:</p>
+
+<div class="highlight"><pre><code class="language-haskell" data-lang="haskell"><span class="nf">reinforce</span> <span class="ow">::</span> <span class="kt">Board</span> <span class="ow">-&gt;</span> <span class="kt">Player</span> <span class="ow">-&gt;</span> <span class="kt">Board</span>
+<span class="nf">reinforce</span> <span class="n">board</span> <span class="n">p</span> <span class="ow">=</span> <span class="n">board</span> <span class="p">{</span> 
+                        <span class="n">cells</span> <span class="ow">=</span> <span class="n">distributeDice</span> <span class="p">(</span><span class="n">cells</span> <span class="n">board</span><span class="p">)</span> <span class="p">(</span><span class="n">conqueredDice</span> <span class="n">board</span> <span class="o">-</span> <span class="mi">1</span><span class="p">),</span>
+                        <span class="n">conqueredDice</span> <span class="ow">=</span> <span class="mi">0</span>
+                    <span class="p">}</span>
+    <span class="kr">where</span>
+        <span class="n">distributeDice</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">Cell</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">Cell</span><span class="p">]</span>
+        <span class="n">distributeDice</span> <span class="kt">[]</span> <span class="kr">_</span> <span class="ow">=</span> <span class="kt">[]</span>  <span class="c1">-- No cells remaining</span>
+        <span class="n">distributeDice</span> <span class="n">cs</span> <span class="mi">0</span> <span class="ow">=</span> <span class="n">cs</span>  <span class="c1">-- No dice remaining</span>
+        <span class="n">distributeDice</span> <span class="p">(</span><span class="n">c</span><span class="kt">:</span><span class="n">cs</span><span class="p">)</span> <span class="n">remainingDice</span> <span class="ow">=</span>
+            <span class="kr">if</span> <span class="n">player</span> <span class="n">c</span> <span class="o">==</span> <span class="n">p</span> <span class="o">&amp;&amp;</span> <span class="n">dice</span> <span class="n">c</span> <span class="o">&lt;</span> <span class="n">maxDice</span> <span class="n">board</span> <span class="kr">then</span>
+                <span class="c1">-- Give this cell an extra dice</span>
+                <span class="n">c</span> <span class="p">{</span><span class="n">dice</span> <span class="ow">=</span> <span class="n">dice</span> <span class="n">c</span> <span class="o">+</span> <span class="mi">1</span><span class="p">}</span> <span class="kt">:</span> <span class="n">distributeDice</span> <span class="n">cs</span> <span class="p">(</span><span class="n">remainingDice</span>  <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+            <span class="kr">else</span> 
+                <span class="c1">-- Continue on</span>
+                <span class="n">c</span> <span class="kt">:</span> <span class="n">distributeDice</span> <span class="n">cs</span> <span class="n">remainingDice</span></code></pre></div>
+
+<h3 id="passing-moves-vs-attack-moves">Passing Moves vs Attack Moves</h3>
+
+<p>One of the rules of the game is that a player cannot pass on their very
+first move - they must make an attack if they can. After their first move
+they player has the option of passing or attacking again.</p>
+
+<p>The Lisp code uses <code>NIL</code> as a pass value. We don’t really have an equivalent
+in Haskell. Instead, we introduce a new data type for all moves:</p>
+
+<div class="highlight"><pre><code class="language-haskell" data-lang="haskell"><span class="kr">data</span> <span class="kt">Move</span> <span class="ow">=</span> <span class="kt">Attack</span> <span class="kt">Int</span> <span class="kt">Int</span> <span class="o">|</span>
+            <span class="kt">Pass</span>
+            <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Show</span><span class="p">)</span></code></pre></div>
+
+<p>We can re-write the code using the new data type:</p>
+
+<p>(Code in DiceOfDoom-d.hs).</p>
+
+<div class="highlight"><pre><code class="language-haskell" data-lang="haskell"><span class="c1">-- List all possible attack moves for a given player on a board</span>
+<span class="nf">attackMoves</span> <span class="ow">::</span> <span class="kt">Board</span> <span class="ow">-&gt;</span> <span class="kt">Player</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">Move</span><span class="p">]</span>
+<span class="nf">attackMoves</span> <span class="n">b</span> <span class="n">p</span> <span class="ow">=</span> <span class="p">[</span><span class="kt">Attack</span> <span class="n">pos</span> <span class="n">neigh</span> <span class="o">|</span> 
+                        <span class="p">(</span><span class="n">pos</span><span class="p">,</span> <span class="kr">_</span><span class="p">)</span> <span class="ow">&lt;-</span> <span class="n">playerPositions</span> <span class="n">b</span> <span class="n">p</span><span class="p">,</span>
+                        <span class="n">neigh</span> <span class="ow">&lt;-</span> <span class="n">neighbours</span> <span class="p">(</span><span class="n">size</span> <span class="n">b</span><span class="p">)</span> <span class="n">pos</span><span class="p">,</span> 
+                        <span class="n">canAttack</span> <span class="n">b</span> <span class="n">pos</span> <span class="n">neigh</span><span class="p">]</span>
+
+<span class="c1">-- Make the attack and return the new board</span>
+<span class="nf">makeAMove</span> <span class="ow">::</span> <span class="kt">Board</span> <span class="ow">-&gt;</span> <span class="kt">Player</span> <span class="ow">-&gt;</span> <span class="kt">Move</span> <span class="ow">-&gt;</span> <span class="kt">Board</span>
+<span class="nf">makeAMove</span> <span class="n">board</span> <span class="kr">_</span> <span class="kt">Pass</span> <span class="ow">=</span> <span class="n">board</span>
+<span class="nf">makeAMove</span> <span class="n">board</span> <span class="n">p</span> <span class="p">(</span><span class="kt">Attack</span> <span class="n">src</span> <span class="n">dest</span><span class="p">)</span>
+    <span class="o">|</span> <span class="n">canAttack</span> <span class="n">board</span> <span class="n">src</span> <span class="n">dest</span>  <span class="ow">=</span> <span class="n">board</span> <span class="p">{</span>
+                                    <span class="n">cells</span> <span class="ow">=</span> <span class="p">[</span><span class="n">afterAttack</span> <span class="p">(</span><span class="n">pos</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span> <span class="o">|</span> <span class="p">(</span><span class="n">pos</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span> <span class="ow">&lt;-</span> <span class="n">cellPositions</span> <span class="n">board</span><span class="p">],</span>
+                                    <span class="n">conqueredDice</span> <span class="ow">=</span> <span class="n">destDice</span>
+                                  <span class="p">}</span>
+    <span class="o">|</span> <span class="n">otherwise</span>                 <span class="ow">=</span> <span class="n">board</span>
+    <span class="kr">where</span>
+        <span class="n">srcDice</span> <span class="ow">=</span> <span class="n">dice</span> <span class="p">(</span><span class="n">cells</span> <span class="n">board</span><span class="o">!!</span> <span class="n">src</span><span class="p">)</span>
+        <span class="n">destDice</span> <span class="ow">=</span> <span class="n">dice</span> <span class="p">(</span><span class="n">cells</span> <span class="n">board</span><span class="o">!!</span> <span class="n">dest</span><span class="p">)</span>
+        <span class="n">afterAttack</span> <span class="p">(</span><span class="n">pos</span><span class="p">,</span> <span class="n">cell</span><span class="p">)</span>
+            <span class="o">|</span> <span class="n">pos</span> <span class="o">==</span> <span class="n">src</span>  <span class="ow">=</span> <span class="n">cell</span> <span class="p">{</span> <span class="n">dice</span> <span class="ow">=</span> <span class="mi">1</span><span class="p">}</span>                        <span class="c1">-- Attacker cell is just left with 1 die</span>
+            <span class="o">|</span> <span class="n">pos</span> <span class="o">==</span> <span class="n">dest</span> <span class="ow">=</span> <span class="n">cell</span> <span class="p">{</span> <span class="n">dice</span> <span class="ow">=</span> <span class="n">srcDice</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">player</span> <span class="ow">=</span> <span class="n">p</span><span class="p">}</span>  <span class="c1">-- Defender cell switches players and gets remaining dice</span>
+            <span class="o">|</span> <span class="n">otherwise</span>   <span class="ow">=</span> <span class="n">cell</span>                                    <span class="c1">-- Not involved in the attack</span></code></pre></div>
+
+<p>Here it makes sense to rename the <code>attack</code> function to <code>makeAMove</code>. A passing move just returns
+the same board.</p>
+
+<p>When a player passes, the next player takes their turn. Remember, there could be any number of 
+players playing, not just A or B.</p>
+
+<div class="highlight"><pre><code class="language-haskell" data-lang="haskell"><span class="nf">nextPlayer</span> <span class="ow">::</span> <span class="kt">Board</span> <span class="ow">-&gt;</span> <span class="kt">Player</span> <span class="ow">-&gt;</span> <span class="kt">Player</span>
+<span class="nf">nextPlayer</span> <span class="n">board</span> <span class="p">(</span><span class="kt">Player</span> <span class="n">n</span><span class="p">)</span> <span class="ow">=</span> <span class="kt">Player</span> <span class="p">((</span><span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="p">`</span><span class="n">mod</span><span class="p">`</span> <span class="p">(</span><span class="n">numPlayers</span> <span class="n">board</span><span class="p">))</span></code></pre></div>
+
+<h3 id="putting-it-all-together---the-game-tree">Putting It All Together - The Game Tree</h3>
+
+<p>The Lisp code uses an ordinary list to represent the game tree. In Haskell, we 
+can use the <code>Date.Tree</code> type, where the nodes in the tree reprsent 
+the game state:</p>
+
+<div class="highlight"><pre><code class="language-haskell" data-lang="haskell"><span class="kr">import</span> <span class="nn">Data.Tree</span>
+
+<span class="kr">data</span> <span class="kt">GameState</span> <span class="ow">=</span> <span class="kt">GameState</span> <span class="p">{</span>
+                    <span class="n">currentPlayer</span> <span class="ow">::</span> <span class="kt">Player</span><span class="p">,</span>
+                    <span class="n">moveMade</span> <span class="ow">::</span> <span class="kt">Move</span><span class="p">,</span>
+                    <span class="n">currentBoard</span> <span class="ow">::</span> <span class="kt">Board</span>
+                 <span class="p">}</span>
+                 <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Show</span><span class="p">)</span>
+
+<span class="c1">-- The initial tree with the starting position of the game</span>
+<span class="nf">gameTree</span> <span class="ow">::</span> <span class="kt">Tree</span> <span class="kt">GameState</span>
+<span class="nf">gameTree</span> <span class="ow">=</span> <span class="kt">Node</span> <span class="p">{</span> 
+    <span class="n">currentPlayer</span> <span class="ow">=</span> <span class="p">(</span><span class="kt">Player</span> <span class="mi">0</span><span class="p">),</span> 
+    <span class="n">moveMade</span> <span class="ow">=</span> <span class="kt">Pass</span><span class="p">,</span> 
+    <span class="n">currentBoard</span> <span class="ow">=</span> <span class="n">test2x2Board</span> <span class="p">}</span> <span class="kt">[]</span></code></pre></div>
+
+<p>The first part is the root of the tree. The second part, the empty list, is the sub-tree.</p>
+
+<p>In GHCI, this displays as:</p>
+
+<div class="highlight"><pre><code class="language-haskell" data-lang="haskell"><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="n">sampleGameTree</span>
+<span class="nf">sampleGameTree</span> <span class="ow">::</span> <span class="kt">Tree</span> <span class="kt">GameState</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">sampleGameTree</span> 
+<span class="kt">Node</span> <span class="p">{</span>
+    <span class="n">rootLabel</span> <span class="ow">=</span> <span class="kt">GameState</span> <span class="p">{</span>
+        <span class="n">currentPlayer</span> <span class="ow">=</span> <span class="n">a</span><span class="p">,</span> 
+        <span class="n">moveMade</span> <span class="ow">=</span> <span class="kt">Pass</span><span class="p">,</span> 
+        <span class="n">currentBoard</span> <span class="ow">=</span> <span class="kt">Board</span> <span class="p">{</span>
+            <span class="n">size</span> <span class="ow">=</span> <span class="mi">2</span><span class="p">,</span> 
+            <span class="n">maxDice</span> <span class="ow">=</span> <span class="mi">3</span><span class="p">,</span> 
+            <span class="n">numPlayers</span> <span class="ow">=</span> <span class="mi">2</span><span class="p">,</span> 
+            <span class="n">cells</span> <span class="ow">=</span> <span class="p">[</span><span class="n">b</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="n">b</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="n">a</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="n">b</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="p">}</span>
+    <span class="p">},</span> 
+    <span class="n">subForest</span> <span class="ow">=</span> <span class="kt">[]</span>
+<span class="p">}</span></code></pre></div>
+
+<p>The next move is A attacking from 2 to 3. This is added to the tree:</p>
+
+<div class="highlight"><pre><code class="language-haskell" data-lang="haskell"><span class="nf">sampleNextGameTree</span> <span class="ow">::</span> <span class="kt">Tree</span> <span class="kt">GameState</span>
+<span class="nf">sampleNextGameTree</span>  <span class="ow">=</span> <span class="kt">Node</span> <span class="kt">GameState</span> <span class="p">{</span> 
+    <span class="n">currentPlayer</span> <span class="ow">=</span> <span class="p">(</span><span class="kt">Player</span> <span class="mi">0</span><span class="p">),</span> 
+    <span class="n">moveMade</span> <span class="ow">=</span> <span class="kt">Pass</span><span class="p">,</span> 
+    <span class="n">currentBoard</span> <span class="ow">=</span> <span class="n">test2x2Board</span> <span class="p">}</span> <span class="p">[</span><span class="kt">Node</span> <span class="kt">GameState</span> <span class="p">{</span>
+        <span class="n">currentPlayer</span> <span class="ow">=</span> <span class="p">(</span><span class="kt">Player</span> <span class="mi">0</span><span class="p">),</span>
+        <span class="n">moveMade</span> <span class="ow">=</span> <span class="kt">Attack</span> <span class="mi">2</span> <span class="mi">3</span><span class="p">,</span>
+        <span class="n">currentBoard</span> <span class="ow">=</span> <span class="n">makeAMove</span> <span class="n">test2x2Board</span> <span class="p">(</span><span class="kt">Player</span> <span class="mi">0</span><span class="p">)</span> <span class="p">(</span><span class="kt">Attack</span> <span class="mi">2</span> <span class="mi">3</span><span class="p">)}</span> <span class="kt">[]</span> <span class="p">]</span></code></pre></div>
+
+<p>In GHCI:</p>
+
+<div class="highlight"><pre><code class="language-haskell" data-lang="haskell"><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">sampleNextGameTree</span>
+<span class="kt">Node</span> <span class="p">{</span>
+    <span class="n">rootLabel</span> <span class="ow">=</span> <span class="kt">GameState</span> <span class="p">{</span>
+        <span class="n">currentPlayer</span> <span class="ow">=</span> <span class="n">a</span><span class="p">,</span> 
+        <span class="n">moveMade</span> <span class="ow">=</span> <span class="kt">Pass</span><span class="p">,</span> 
+        <span class="n">currentBoard</span> <span class="ow">=</span> <span class="kt">Board</span> <span class="p">{</span>
+            <span class="n">size</span> <span class="ow">=</span> <span class="mi">2</span><span class="p">,</span> 
+            <span class="n">maxDice</span> <span class="ow">=</span> <span class="mi">3</span><span class="p">,</span> 
+            <span class="n">numPlayers</span> <span class="ow">=</span> <span class="mi">2</span><span class="p">,</span> 
+            <span class="n">cells</span> <span class="ow">=</span> <span class="p">[</span><span class="n">b</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="n">b</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="n">a</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="n">b</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="p">}</span>
+    <span class="p">},</span> 
+    <span class="n">subForest</span> <span class="ow">=</span> <span class="p">[</span>
+        <span class="kt">Node</span> <span class="p">{</span>
+            <span class="n">rootLabel</span> <span class="ow">=</span> <span class="kt">GameState</span> <span class="p">{</span>
+                <span class="n">currentPlayer</span> <span class="ow">=</span> <span class="n">a</span><span class="p">,</span> 
+                <span class="n">moveMade</span> <span class="ow">=</span> <span class="kt">Attack</span> <span class="mi">2</span> <span class="mi">3</span><span class="p">,</span> 
+                <span class="n">currentBoard</span> <span class="ow">=</span> <span class="kt">Board</span> <span class="p">{</span>
+                    <span class="n">size</span> <span class="ow">=</span> <span class="mi">2</span><span class="p">,</span> 
+                    <span class="n">maxDice</span> <span class="ow">=</span> <span class="mi">3</span><span class="p">,</span> 
+                    <span class="n">numPlayers</span> <span class="ow">=</span> <span class="mi">2</span><span class="p">,</span> 
+                    <span class="n">cells</span> <span class="ow">=</span> <span class="p">[</span><span class="n">b</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="n">b</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="n">a</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="n">a</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                <span class="p">}</span>
+            <span class="p">},</span> 
+            <span class="n">subForest</span> <span class="ow">=</span> <span class="kt">[]</span><span class="p">}]}</span></code></pre></div>
+
+<p>To produce the game tree we get the current root node, find all 
+possible moves (including a ‘Pass’ move if it isn’t the player’s first turn)
+and for each one of these moves, re-generate the board. The ‘Pass’ move
+will switch players, adding reinforcements if available. We recursively do 
+this until we’ve exhausted all possible moves. If we can’t make a move 
+on our first turn, the game ends.</p>
+
+<p>Note that the Haskell version here is different in structure from the Lisp version. The 
+logic is the same, but I personally don’t like functions that recursively call other
+functions - I prefer to keep everything in one. This is why the <code>attackMoves</code> function
+doesn’t generate part of the game tree - it just calculates the attacking moves.</p>
+
+<div class="highlight"><pre><code class="language-haskell" data-lang="haskell"><span class="nf">gameTree</span> <span class="ow">::</span> <span class="kt">Board</span> <span class="ow">-&gt;</span> <span class="kt">Player</span> <span class="ow">-&gt;</span> <span class="kt">Move</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span> <span class="ow">-&gt;</span> <span class="kt">Tree</span> <span class="kt">GameState</span>
+<span class="nf">gameTree</span> <span class="n">board</span> <span class="n">p</span> <span class="n">fromMove</span> <span class="n">isFirstMove</span>  
+    <span class="c1">-- Test to see if we need to switch players</span>
+    <span class="c1">-- If so, we need to add the reinforcements</span>
+    <span class="o">|</span> <span class="n">null</span> <span class="n">possibleMoves</span> <span class="o">&amp;&amp;</span> <span class="n">not</span> <span class="n">isFirstMove</span> <span class="ow">=</span> 
+        <span class="kt">Node</span> <span class="kt">GameState</span> <span class="p">{</span>
+            <span class="n">currentPlayer</span> <span class="ow">=</span> <span class="n">p</span><span class="p">,</span>
+            <span class="n">moveMade</span> <span class="ow">=</span> <span class="n">fromMove</span><span class="p">,</span>
+            <span class="n">currentBoard</span> <span class="ow">=</span> <span class="n">board</span>
+        <span class="p">}</span> <span class="p">[</span><span class="n">gameTree</span> <span class="p">(</span><span class="n">reinforce</span> <span class="n">board</span> <span class="n">p</span><span class="p">)</span> <span class="p">(</span><span class="n">nextPlayer</span> <span class="n">board</span> <span class="n">p</span><span class="p">)</span> <span class="kt">Pass</span> <span class="kt">True</span><span class="p">]</span> 
+    <span class="c1">-- Keeping with the same player, recurse through all moves                                              </span>
+    <span class="o">|</span> <span class="n">otherwise</span> <span class="ow">=</span> 
+        <span class="kt">Node</span> <span class="kt">GameState</span> <span class="p">{</span>
+            <span class="n">currentPlayer</span> <span class="ow">=</span> <span class="n">p</span><span class="p">,</span>
+            <span class="n">moveMade</span> <span class="ow">=</span> <span class="n">fromMove</span><span class="p">,</span>
+            <span class="n">currentBoard</span> <span class="ow">=</span> <span class="n">board</span>
+        <span class="p">}</span> <span class="p">[</span><span class="n">gameTree</span> <span class="p">(</span><span class="n">makeAMove</span> <span class="n">board</span> <span class="n">p</span> <span class="n">m</span><span class="p">)</span> <span class="n">p</span> <span class="n">m</span> <span class="kt">False</span> <span class="o">|</span> <span class="n">m</span> <span class="ow">&lt;-</span> <span class="n">possibleMoves</span><span class="p">]</span> 
+    <span class="kr">where</span>
+        <span class="n">possibleMoves</span> <span class="ow">=</span> <span class="n">attackMoves</span> <span class="n">board</span> <span class="n">p</span></code></pre></div>
+
+<p>We can test it out. First, if player B starts off on the 2x2 board, there are no further 
+moves possible:</p>
+
+<div class="highlight"><pre><code class="language-haskell" data-lang="haskell"><span class="nf">ghci</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">l</span> <span class="kt">DiceOfDoom</span><span class="o">-</span><span class="n">d</span><span class="o">.</span><span class="n">hs</span>
+<span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">gameTree</span> <span class="n">test2x2Board</span> <span class="p">(</span><span class="kt">Player</span> <span class="mi">1</span><span class="p">)</span> <span class="kt">Pass</span> <span class="mi">0</span> <span class="kt">True</span> 
+<span class="kt">Node</span> <span class="p">{</span>
+    <span class="n">rootLabel</span> <span class="ow">=</span> <span class="kt">GameState</span> <span class="p">{</span>
+        <span class="n">currentPlayer</span> <span class="ow">=</span> <span class="n">b</span><span class="p">,</span> 
+        <span class="n">moveMade</span> <span class="ow">=</span> <span class="kt">Pass</span><span class="p">,</span> 
+        <span class="n">currentBoard</span> <span class="ow">=</span> <span class="p">[</span><span class="n">b</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="n">b</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="n">a</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="n">b</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">reinforcements</span> <span class="kt">:</span> <span class="mi">0</span>
+    <span class="p">},</span> 
+    <span class="n">subForest</span> <span class="ow">=</span> <span class="kt">[]</span><span class="p">}</span></code></pre></div>
+
+<p>The Board’s <code>Show</code> instance has been implemented to just show cells and conquered dice:</p>
+
+<div class="highlight"><pre><code class="language-haskell" data-lang="haskell"><span class="kr">instance</span> <span class="kt">Show</span> <span class="kt">Board</span> <span class="kr">where</span>
+    <span class="n">show</span> <span class="n">b</span> <span class="ow">=</span> <span class="n">show</span> <span class="p">(</span><span class="n">cells</span> <span class="n">b</span><span class="p">)</span> <span class="o">++</span> <span class="s">&quot;, reinforcements : &quot;</span> <span class="o">++</span> <span class="n">show</span> <span class="p">(</span><span class="n">conqueredDice</span> <span class="n">b</span><span class="p">)</span></code></pre></div>
+
+<p>Next, if player A starts off, we get a fuller game tree:</p>
+
+<div class="highlight"><pre><code class="language-haskell" data-lang="haskell"><span class="nf">ghci</span><span class="o">&gt;</span> <span class="n">gameTree</span> <span class="n">test2x2Board</span> <span class="p">(</span><span class="kt">Player</span> <span class="mi">0</span><span class="p">)</span> <span class="kt">Pass</span> <span class="mi">0</span> <span class="kt">True</span> 
+<span class="kt">Node</span><span class="p">{</span>
+  <span class="n">rootLabel</span><span class="ow">=</span><span class="kt">GameState</span><span class="p">{</span> <span class="n">currentPlayer</span><span class="ow">=</span><span class="n">a</span><span class="p">,</span> <span class="n">moveMade</span><span class="ow">=</span><span class="kt">Pass</span><span class="p">,</span> <span class="n">currentBoard</span><span class="ow">=</span><span class="p">[</span> <span class="n">b</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="n">b</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="n">a</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="n">b</span><span class="o">-</span><span class="mi">1</span> <span class="p">],</span> <span class="n">reinforcements</span><span class="kt">:</span> <span class="mi">0</span> <span class="p">},</span>
+  <span class="n">subForest</span><span class="ow">=</span><span class="p">[</span>
+    <span class="kt">Node</span><span class="p">{</span>
+      <span class="n">rootLabel</span><span class="ow">=</span><span class="kt">GameState</span><span class="p">{</span> <span class="n">currentPlayer</span><span class="ow">=</span><span class="n">a</span><span class="p">,</span> <span class="n">moveMade</span><span class="ow">=</span><span class="kt">Attack</span> <span class="mi">2</span> <span class="mi">3</span><span class="p">,</span> <span class="n">currentBoard</span><span class="ow">=</span><span class="p">[</span> <span class="n">b</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="n">b</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="n">a</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">a</span><span class="o">-</span><span class="mi">1</span> <span class="p">],</span> <span class="n">reinforcements</span><span class="kt">:</span> <span class="mi">1</span> <span class="p">},</span>
+      <span class="n">subForest</span><span class="ow">=</span><span class="p">[</span>
+        <span class="kt">Node</span><span class="p">{</span>
+          <span class="n">rootLabel</span><span class="ow">=</span><span class="kt">GameState</span><span class="p">{</span> <span class="n">currentPlayer</span><span class="ow">=</span><span class="n">b</span><span class="p">,</span> <span class="n">moveMade</span><span class="ow">=</span><span class="kt">Pass</span><span class="p">,</span> <span class="n">currentBoard</span><span class="ow">=</span><span class="p">[</span> <span class="n">b</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="n">b</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="n">a</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">a</span><span class="o">-</span><span class="mi">1</span> <span class="p">],</span> <span class="n">reinforcements</span><span class="kt">:</span> <span class="mi">0</span> <span class="p">},</span>
+          <span class="n">subForest</span><span class="ow">=</span><span class="p">[</span>
+            <span class="kt">Node</span><span class="p">{</span>
+              <span class="n">rootLabel</span><span class="ow">=</span><span class="kt">GameState</span><span class="p">{</span> <span class="n">currentPlayer</span><span class="ow">=</span><span class="n">b</span><span class="p">,</span> <span class="n">moveMade</span><span class="ow">=</span><span class="kt">Attack</span> <span class="mi">0</span> <span class="mi">2</span><span class="p">,</span> <span class="n">currentBoard</span><span class="ow">=</span><span class="p">[</span> <span class="n">b</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">b</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="n">b</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">a</span><span class="o">-</span><span class="mi">1</span> <span class="p">],</span> <span class="n">reinforcements</span><span class="kt">:</span> <span class="mi">1</span> <span class="p">},</span>
+              <span class="n">subForest</span><span class="ow">=</span><span class="p">[</span>
+                <span class="kt">Node</span><span class="p">{</span>
+                  <span class="n">rootLabel</span><span class="ow">=</span><span class="kt">GameState</span><span class="p">{</span> <span class="n">currentPlayer</span><span class="ow">=</span><span class="n">b</span><span class="p">,</span> <span class="n">moveMade</span><span class="ow">=</span><span class="kt">Attack</span> <span class="mi">1</span> <span class="mi">3</span><span class="p">,</span> <span class="n">currentBoard</span><span class="ow">=</span><span class="p">[</span> <span class="n">b</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">b</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">b</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">b</span><span class="o">-</span><span class="mi">1</span> <span class="p">],</span> <span class="n">reinforcements</span><span class="kt">:</span> <span class="mi">1</span> <span class="p">},</span>
+                  <span class="n">subForest</span><span class="ow">=</span><span class="p">[</span>
+                    <span class="kt">Node</span><span class="p">{</span>
+                      <span class="n">rootLabel</span><span class="ow">=</span><span class="kt">GameState</span><span class="p">{</span> <span class="n">currentPlayer</span><span class="ow">=</span><span class="n">a</span><span class="p">,</span> <span class="n">moveMade</span><span class="ow">=</span><span class="kt">Pass</span><span class="p">,</span> <span class="n">currentBoard</span><span class="ow">=</span><span class="p">[</span> <span class="n">b</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">b</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">b</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">b</span><span class="o">-</span><span class="mi">1</span> <span class="p">],</span> <span class="n">reinforcements</span><span class="kt">:</span> <span class="mi">0</span> <span class="p">},</span>
+                      <span class="n">subForest</span><span class="ow">=</span><span class="p">[</span> <span class="p">]</span> <span class="p">}</span> <span class="p">]</span> <span class="p">}</span> <span class="p">]</span>
+            <span class="p">},</span>
+            <span class="kt">Node</span><span class="p">{</span>
+              <span class="n">rootLabel</span><span class="ow">=</span><span class="kt">GameState</span><span class="p">{</span> <span class="n">currentPlayer</span><span class="ow">=</span><span class="n">b</span><span class="p">,</span> <span class="n">moveMade</span><span class="ow">=</span><span class="kt">Attack</span> <span class="mi">0</span> <span class="mi">3</span><span class="p">,</span> <span class="n">currentBoard</span><span class="ow">=</span><span class="p">[</span> <span class="n">b</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">b</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="n">a</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">b</span><span class="o">-</span><span class="mi">1</span> <span class="p">],</span> <span class="n">reinforcements</span><span class="kt">:</span> <span class="mi">1</span> <span class="p">},</span>
+              <span class="n">subForest</span><span class="ow">=</span><span class="p">[</span>
+                <span class="kt">Node</span><span class="p">{</span>
+                  <span class="n">rootLabel</span><span class="ow">=</span><span class="kt">GameState</span><span class="p">{</span> <span class="n">currentPlayer</span><span class="ow">=</span><span class="n">a</span><span class="p">,</span> <span class="n">moveMade</span><span class="ow">=</span><span class="kt">Pass</span><span class="p">,</span> <span class="n">currentBoard</span><span class="ow">=</span><span class="p">[</span> <span class="n">b</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">b</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="n">a</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">b</span><span class="o">-</span><span class="mi">1</span> <span class="p">],</span> <span class="n">reinforcements</span><span class="kt">:</span> <span class="mi">0</span> <span class="p">},</span>
+                  <span class="n">subForest</span><span class="ow">=</span><span class="p">[</span> <span class="p">]</span> <span class="p">}</span> <span class="p">]</span>
+            <span class="p">},</span>
+            <span class="kt">Node</span><span class="p">{</span>
+              <span class="n">rootLabel</span><span class="ow">=</span><span class="kt">GameState</span><span class="p">{</span> <span class="n">currentPlayer</span><span class="ow">=</span><span class="n">b</span><span class="p">,</span> <span class="n">moveMade</span><span class="ow">=</span><span class="kt">Attack</span> <span class="mi">1</span> <span class="mi">3</span><span class="p">,</span> <span class="n">currentBoard</span><span class="ow">=</span><span class="p">[</span> <span class="n">b</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="n">b</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">a</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">b</span><span class="o">-</span><span class="mi">1</span> <span class="p">],</span> <span class="n">reinforcements</span><span class="kt">:</span> <span class="mi">1</span> <span class="p">},</span>
+              <span class="n">subForest</span><span class="ow">=</span><span class="p">[</span>
+                <span class="kt">Node</span><span class="p">{</span>
+                  <span class="n">rootLabel</span><span class="ow">=</span><span class="kt">GameState</span><span class="p">{</span> <span class="n">currentPlayer</span><span class="ow">=</span><span class="n">b</span><span class="p">,</span> <span class="n">moveMade</span><span class="ow">=</span><span class="kt">Attack</span> <span class="mi">0</span> <span class="mi">2</span><span class="p">,</span> <span class="n">currentBoard</span><span class="ow">=</span><span class="p">[</span> <span class="n">b</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">b</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">b</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">b</span><span class="o">-</span><span class="mi">1</span> <span class="p">],</span> <span class="n">reinforcements</span><span class="kt">:</span> <span class="mi">1</span> <span class="p">},</span>
+                  <span class="n">subForest</span><span class="ow">=</span><span class="p">[</span>
+                    <span class="kt">Node</span><span class="p">{</span>
+                      <span class="n">rootLabel</span><span class="ow">=</span><span class="kt">GameState</span><span class="p">{</span> <span class="n">currentPlayer</span><span class="ow">=</span><span class="n">a</span><span class="p">,</span> <span class="n">moveMade</span><span class="ow">=</span><span class="kt">Pass</span><span class="p">,</span> <span class="n">currentBoard</span><span class="ow">=</span><span class="p">[</span> <span class="n">b</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">b</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">b</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">b</span><span class="o">-</span><span class="mi">1</span> <span class="p">],</span> <span class="n">reinforcements</span><span class="kt">:</span> <span class="mi">0</span> <span class="p">},</span>
+                      <span class="n">subForest</span><span class="ow">=</span><span class="p">[</span> <span class="p">]</span> <span class="p">}</span> <span class="p">]</span> <span class="p">}</span> <span class="p">]</span> <span class="p">}</span> <span class="p">]</span> <span class="p">}</span> <span class="p">]</span> <span class="p">}</span> <span class="p">]</span> <span class="p">}</span></code></pre></div>
+
+<p>Code in DiceOfDoom-d.hs</p>
+
+</article>
+
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+  <div class="p2 wrap">
+    <div class="measure mt1 center">
+      <small>
+        Based on the Pixyll theme by <a href="http://johnotander.com">John Otander</a><br>
+        &lt;/&gt; available on <a href="https://github.com/johnotander/pixyll.git">Github</a>.
+      </small>
+    </div>
+  </div>
+</footer>
+
+
+
+</body>
+</html>

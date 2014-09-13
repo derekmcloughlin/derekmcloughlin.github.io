@@ -1,0 +1,14 @@
+# Site settings
+title: Derek McLoughlin
+email: derek.mcloughlin@gmail.com
+author: Derek McLoughlin
+description: "A simple, beautiful theme for Jekyll that emphasizes content rather than aesthetic fluff."
+baseurl: ""
+url: "http://derekmcloughlin.github.io"
+google_analytics:
+animated: false
+
+# Build settings
+markdown: kramdown
+permalink: pretty
+paginate: 3
