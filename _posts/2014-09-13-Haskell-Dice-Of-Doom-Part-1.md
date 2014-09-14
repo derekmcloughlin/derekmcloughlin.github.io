@@ -164,7 +164,7 @@ a "clean, functional" style vs. those that have a "dirty, imperative" style.
 The Lisp code to generate a randomly populated board is not functional, and
 has the "dirty, imperative" icon:
 
-![dirty-imperative](https://github.com/derekmcloughlin/derekmcloughlin.github.io/blob/master/dirty-imperative.png)
+![dirty-imperative]({{ site.url }}/images/dirty-imperative.png)
 
 {% highlight lisp %}
 (defun board-list ()
@@ -400,7 +400,7 @@ A #((1 2) (1 2) (0 2) (1 1))
 
 It's better to see it in a diagram:
 
-![gametree](https://github.com/derekmcloughlin/derekmcloughlin.github.io/blob/master/game_tree.png)
+![gametree]({{ site.url }}/images/game_tree.png)
 
 Compare this with the game tree for the same board but with B playing first:
 
