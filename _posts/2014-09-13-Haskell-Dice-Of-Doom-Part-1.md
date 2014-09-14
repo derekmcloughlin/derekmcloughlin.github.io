@@ -46,7 +46,7 @@ choose your move:
 
 The above 3x3 board looks like this:
 
-![3x3board](http://localhost:4000/3x3board.png)
+![3x3board](https://github.com/derekmcloughlin/derekmcloughlin.github.io/blob/master/3x3board.png)
 
 The rules of the game are as follows: 
 
@@ -164,7 +164,7 @@ a "clean, functional" style vs. those that have a "dirty, imperative" style.
 The Lisp code to generate a randomly populated board is not functional, and
 has the "dirty, imperative" icon:
 
-![dirty-imperative](http://localhost:4000/dirty-imperative.png)
+![dirty-imperative](https://github.com/derekmcloughlin/derekmcloughlin.github.io/blob/master/dirty-imperative.png)
 
 {% highlight lisp %}
 (defun board-list ()
@@ -400,7 +400,7 @@ A #((1 2) (1 2) (0 2) (1 1))
 
 It's better to see it in a diagram:
 
-![gametree](http://localhost:4000/game_tree.png)
+![gametree](https://github.com/derekmcloughlin/derekmcloughlin.github.io/blob/master/game_tree.png)
 
 Compare this with the game tree for the same board but with B playing first:
 
