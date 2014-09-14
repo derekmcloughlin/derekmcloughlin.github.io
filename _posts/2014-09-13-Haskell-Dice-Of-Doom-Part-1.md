@@ -840,7 +840,7 @@ playVsHuman :: Tree GameState -> IO ()
 playVsHuman (Node root children) = do
     printGameState (Node root children)
     if not (null children)
-        then putStrLn "TODO
+        then putStrLn "TODO"
         else announceWinner $ currentBoard root 
 
 printGameState :: Tree GameState -> IO ()
