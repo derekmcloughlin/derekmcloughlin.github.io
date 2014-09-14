@@ -46,7 +46,7 @@ choose your move:
 
 The above 3x3 board looks like this:
 
-![3x3board](https://github.com/derekmcloughlin/derekmcloughlin.github.io/blob/master/3x3board.png)
+![3x3board]({{ site.url }}/images/3x3board.png)
 
 The rules of the game are as follows: 
 
@@ -58,13 +58,13 @@ perform at least one move. If the player cannot move, the game ends.
 * A move consists of attacking a neighboring hexagon owned by the
 opponent. The player must have more dice in her hexagon than the
 neighboring hexagon in order to attack. For now, all attacks will automatically
-lead to a win. In future variants, well actually roll the dice for a
+lead to a win. In future variants, we'll actually roll the dice for a
 battle. But for now, the player with more dice just wins automatically.
-* After winning a battle, the losing players dice are removed from the
-board, and all but one of the winning players dice are moved onto the
+* After winning a battle, the losing player's dice are removed from the
+board, and all but one of the winning player's dice are moved onto the
 newly won hexagon.
 * After a player is finished making her moves, reinforcements are added to
-that players dice armies. Reinforcements to the players occupied hexagons
+that player's dice armies. Reinforcements to the player's occupied hexagons
 are added one die at a time, starting from the upper-left corner, moving
 across and down. The maximum number of dice added as reinforcements
 is one less than the player took from the opponent in her completed turn.
