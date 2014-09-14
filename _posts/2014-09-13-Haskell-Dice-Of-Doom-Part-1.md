@@ -19,7 +19,7 @@ found [here](http://landoflisp.com/dice_of_doom_v1.lisp).
 
 Alternatively use `dice_of_doom_v1.lisp` that accompanies this source.
 
-Download this file, or use the one with the source code here.
+Download this file.
 
 To run it you'll need a working [CLisp](http://sourceforge.net/projects/clisp/) 
 or [SBCL](http://www.sbcl.org/) environment. We'll use CLisp to test the run:
@@ -227,7 +227,6 @@ Board {
 {% endhighlight %}
 
 ## Drawing The Board
------------------
 
 The data types given so far use the default implementation of the `Show` typeclass. 
 We'll change that now to represent the board in the same way as the Lisp code.
@@ -423,7 +422,7 @@ The last two functions recurse back to the first.
 ## Calculating Attacking Moves
 
 Let's look at the `attacking-moves` function. Given a board and a player, finding out the
-list of attacking moves involves finding all the cells for that player and for each
+list of attacking moves involves finding all the cells for that player, and for each
 cell finding the list of attacking moves to the opposition's cells that are in the
 neighbourhood of the player.
 
@@ -525,14 +524,20 @@ Haskell version is similar:
 {% highlight haskell %}
 attack :: Board -> Player -> Int -> Int -> Board
 attack board p src dest
-    | canAttack board src dest  = board {cells = [afterAttack (pos, c) | (pos, c) <- cellPositions board]}
-    | otherwise                 = board
+    | canAttack board src dest  = 
+        board {
+            cells = [afterAttack (pos, c) | (pos, c) <- cellPositions board]
+        }
+    | otherwise = board
     where
         srcDice = dice (cells board!! src)
         afterAttack (pos, cell)
-            | pos == src  = cell { dice = 1}                        -- Attacker cell is just left with 1 die
-            | pos == dest = cell { dice = srcDice - 1, player = p}  -- Defender cell switches players and gets remaining dice
-            | otherwise   = cell                                    -- Not involved in the attack
+            -- Attacker cell is just left with 1 die
+            | pos == src  = cell { dice = 1}                        
+            -- Defender cell switches players and gets remaining dice
+            | pos == dest = cell { dice = srcDice - 1, player = p}  
+            -- Not involved in the attack
+            | otherwise   = cell                                    
 {% endhighlight %}
 
 ### Reinforcements
@@ -594,22 +599,27 @@ attackMoves b p = [Attack pos neigh |
                         neigh <- neighbours (size b) pos, 
                         canAttack b pos neigh]
 
--- Make the attack and return the new board
+-- Make a move and return the new board
 makeAMove :: Board -> Player -> Move -> Board
 makeAMove board _ Pass = board
 makeAMove board p (Attack src dest)
-    | canAttack board src dest  = board {
-                                    cells = [afterAttack (pos, c) | (pos, c) <- cellPositions board],
-                                    conqueredDice = destDice
-                                  }
-    | otherwise                 = board
+    | canAttack board src dest = 
+        board {
+            cells = [afterAttack (pos, c) | (pos, c) <- cellPositions board],
+            conqueredDice = destDice
+        }
+    | otherwise = 
+        board
     where
         srcDice = dice (cells board!! src)
         destDice = dice (cells board!! dest)
         afterAttack (pos, cell)
-            | pos == src  = cell { dice = 1}                        -- Attacker cell is just left with 1 die
-            | pos == dest = cell { dice = srcDice - 1, player = p}  -- Defender cell switches players and gets remaining dice
-            | otherwise   = cell                                    -- Not involved in the attack
+            -- Attacker cell is just left with 1 die
+            | pos == src  = cell { dice = 1}                        
+            -- Defender cell switches players and gets remaining dice
+            | pos == dest = cell { dice = srcDice - 1, player = p}  
+            -- Not involved in the attack
+            | otherwise   = cell                                    
 {% endhighlight %}
 
 Here it makes sense to rename the `attack` function to `makeAMove`. A passing move just returns
@@ -640,11 +650,12 @@ data GameState = GameState {
                  deriving (Show)
 
 -- The initial tree with the starting position of the game
-gameTree :: Tree GameState
-gameTree = Node { 
-    currentPlayer = (Player 0), 
+sampleGameTree :: Tree GameState
+sampleGameTree = Node GameState { 
+    currentPlayer = Player 0, 
     moveMade = Pass, 
-    currentBoard = test2x2Board } []
+    currentBoard = test2x2Board 
+} []
 {% endhighlight %}
 
 The first part is the root of the tree. The second part, the empty list, is the sub-tree.
@@ -673,14 +684,16 @@ Node {
 The next move is A attacking from 2 to 3. This is added to the tree:
 
 {% highlight haskell %}
-sampleNextGameTree :: Tree GameState
-sampleNextGameTree  = Node GameState { 
-    currentPlayer = (Player 0), 
+sampleGameTreeNext :: Tree GameState
+sampleGameTreeNext  = Node GameState { 
+    currentPlayer = Player 0, 
     moveMade = Pass, 
-    currentBoard = test2x2Board } [Node GameState {
-        currentPlayer = (Player 0),
+    currentBoard = test2x2Board 
+} [Node GameState {
+        currentPlayer = Player 0,
         moveMade = Attack 2 3,
-        currentBoard = makeAMove test2x2Board (Player 0) (Attack 2 3)} [] ]
+        currentBoard = makeAMove test2x2Board (Player 0) (Attack 2 3)
+        } [] ]
 {% endhighlight %}
 
 In GHCI:
