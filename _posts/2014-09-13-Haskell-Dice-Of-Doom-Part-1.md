@@ -546,7 +546,7 @@ After a player's completed turn, which might include several attacks, reinforcem
 are added by dividing the conquered dice among the player's cells, starting from the 
 top and moving from left to right.
 
-Note: The Lisp function is `add-new-dice` and is the tail-call optimised one introduced
+Note: The Lisp function is `add-new-dice` - this is the tail-call optimised one introduced
 later in Chapter 15.
 
 Just like the Lisp function, we use a local function to recurse through the board cells:
@@ -824,3 +824,54 @@ Node{
 {% endhighlight %}
 
 Code in DiceOfDoom-d.hs
+
+## Playing - Human vs Human
+
+We've got all the pieces now to allow a human play against another human.
+
+Given a node in a game tree, we 
+
+* Print the current game state
+* If there are no child nodes then the game has ended - announce the winner.
+* If there are child nodes, print out the possible moves, let the player make that move and recurse.
+
+{% highlight haskell %}
+playVsHuman :: Tree GameState -> IO ()
+playVsHuman (Node root children) = do
+    printGameState (Node root children)
+    if not (null children)
+        then putStrLn "TODO
+        else announceWinner $ currentBoard root 
+
+printGameState :: Tree GameState -> IO ()
+printGameState (Node root _) = do
+    putStrLn $ "Current player: "  ++ show (currentPlayer root)
+    drawBoard $ currentBoard root
+{% endhighlight %}
+
+There can be more than one winner in a game - a draw is possible in a 2-player
+game and a draw is possible between 2 or more players in a N-player game.
+
+{% highlight haskell %}
+announceWinner :: Board -> IO ()
+announceWinner board = 
+    putStrLn $ 
+        if length whoWon > 1 
+            then "The result is a tie between " ++ unwords (map show whoWon)
+            else "The winner is " ++ show (head whoWon)
+    where
+        whoWon = winners board
+
+winners :: Board -> [Player]
+winners board = [head p | p <- players, length p == length (head players)]
+    where
+        players = sortBy (flip compare `on` length) 
+                    $ group 
+                    $ sort [player c | c <- cells board]
+{% endhighlight %}
+
+
+
+
+
+
