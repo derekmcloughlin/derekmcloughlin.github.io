@@ -729,11 +729,12 @@ Node {
 To produce the game tree we get the current root node, find all 
 possible moves (including a 'Pass' move if it isn't the player's first turn)
 and for each one of these moves, re-generate the board. The 'Pass' move
-will switch players, adding reinforcements if available. We recursively do 
+will switch players, adding reinforcements if available. We also switch if
+there are no moves possible. We recursively do 
 this until we've exhausted all possible moves. If we can't make a move 
 on our first turn, the game ends.
 
-Note that the Haskell version here is different in structure from the Lisp version. The 
+Note that the Haskell version here is a bit different in structure from the Lisp version. The 
 logic is the same, but I personally don't like functions that recursively call other
 functions - I prefer to keep everything in one. This is why the `attackMoves` function
 doesn't generate part of the game tree - it just calculates the attacking moves.
@@ -741,23 +742,37 @@ doesn't generate part of the game tree - it just calculates the attacking moves.
 {% highlight haskell %}
 gameTree :: Board -> Player -> Move -> Bool -> Tree GameState
 gameTree board p fromMove isFirstMove  
-    -- Test to see if we need to switch players
-    -- If so, we need to add the reinforcements
+    -- Deliberate Pass
+    | fromMove == Pass && not isFirstMove = 
+         gameTree 
+            (reinforce board p)     -- Add reinforcements
+            (nextPlayer board p)    -- Switch player
+            Pass                    -- Passing move
+            True                    -- First move for new player
+    -- No further moves possible. Switch players and add the reinforcements
     | null possibleMoves && not isFirstMove = 
         Node GameState {
             currentPlayer = p,
             moveMade = fromMove,
             currentBoard = board
-        } [gameTree (reinforce board p) (nextPlayer board p) Pass True] 
-    -- Keeping with the same player, recurse through all moves                                              
+        } [gameTree 
+            (reinforce board p)     -- Add reinforcements
+            (nextPlayer board p)    -- Switch player
+            Pass                    -- Passing move
+            True]                   -- First move for new player
+   -- Keeping with the same player, recurse through all moves                                              
     | otherwise = 
         Node GameState {
             currentPlayer = p,
             moveMade = fromMove,
             currentBoard = board
-        } [gameTree (makeAMove board p m) p m False | m <- possibleMoves] 
-    where
+        } [gameTree (makeAMove board p m) p m False 
+                | m <- possibleMoves ++ addPassingMove] 
+     where
         possibleMoves = attackMoves board p
+        addPassingMove = if isFirstMove
+                             then []
+                             else [Pass]
 {% endhighlight %}
 
 We can test it out. First, if player B starts off on the 2x2 board, there are no further 
@@ -840,8 +855,10 @@ playVsHuman :: Tree GameState -> IO ()
 playVsHuman (Node root children) = do
     printGameState (Node root children)
     if not (null children)
-        then putStrLn "TODO"
-        else announceWinner $ currentBoard root 
+        then
+            playVsHuman =<< handleHuman tree
+        else 
+            announceWinner $ currentBoard root 
 
 printGameState :: Tree GameState -> IO ()
 printGameState (Node root _) = do
@@ -870,8 +887,85 @@ winners board = [head p | p <- players, length p == length (head players)]
                     $ sort [player c | c <- cells board]
 {% endhighlight %}
 
+Handling the human input is another 'dirty' function. Given a game tree, 
+tell the human what their options are and ask for input, returning the
+subtree that they chose:
+
+{% highlight haskell %}
+handleHuman :: Tree GameState -> IO (Tree GameState)
+handleHuman tree@(Node _ children) = do
+    putStrLn "choose your move:"
+    putStr $ showChoice allowedMoves
+    userInput <- getLine 
+    let choice = read userInput :: Int
+    case Map.lookup choice mapOfMoves of
+        Just _ -> 
+            return $ children !! (choice - 1)
+        Nothing -> do
+            putStrLn "Invalid choice. Choose again."
+            handleHuman tree
+    where
+        allowedMoves :: [(Int, Move)]
+        allowedMoves = zip [1..] [moveMade c | (Node c _) <- children]
+        showChoice :: [(Int, Move)] -> String
+        showChoice choices = unlines [show num ++ ": " ++ show move | (num, move) <- choices]
+        mapOfMoves :: Map.Map Int Move
+        mapOfMoves = Map.fromList allowedMoves
+{% endhighlight %}
+
+The code uses `Data.Map` to create a map between choices numbers and the child nodes in the tree.
+
+Let's give it a shot:
 
 
+{% highlight haskell %}
+ghci> :l DiceOfDoom-e.hs
+ghci> playVsHuman $ gameTree test2x2Board (Player 0) Pass True
+Current player: a
+    b-2 b-2
+  a-2 b-1
 
+choose your move:
+1: Attack 2 3
+1
+Current player: a
+    b-2 b-2
+  a-1 a-1
 
+choose your move:
+1: Pass
+1
+Current player: b
+    b-2 b-2
+  a-1 a-1
+
+choose your move:
+1: Attack 0 2
+2: Attack 0 3
+3: Attack 1 3
+1
+Current player: b
+    b-1 b-2
+  b-1 a-1
+
+choose your move:
+1: Attack 1 3
+2: Pass
+1
+Current player: b
+    b-1 b-1
+  b-1 b-1
+
+choose your move:
+1: Pass
+1
+Current player: a
+    b-1 b-1
+  b-1 b-1
+
+The winner is b
+{% endhighlight %}
+
+That's it for part 1. In the next part we'll work on the AI player, and 
+start worrying about performance and optimisation.
 
