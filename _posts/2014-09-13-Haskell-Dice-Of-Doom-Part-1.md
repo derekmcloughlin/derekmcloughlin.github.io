@@ -12,6 +12,8 @@ and can attack each other subject to some rules.
 
 In this series we'll rewrite the game using Haskell.
 
+The source code for this can be found on Github: [Dice of Doom](https://github.com/derekmcloughlin/DiceOfDoom)
+
 ## The Original Lisp Game
 
 The source code for the Lisp version can be 
