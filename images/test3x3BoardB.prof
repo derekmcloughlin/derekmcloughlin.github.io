@@ -1,0 +1,219 @@
+	Sun Oct  5 14:58 2014 Time and Allocation Profiling Report  (Final)
+
+	   DiceOfDoom-h +RTS -p -RTS
+
+	total time  =       13.54 secs   (13535 ticks @ 1000 us, 1 processor)
+	total alloc = 8,696,272,912 bytes  (excludes profiling overheads)
+
+COST CENTRE                   MODULE  %time %alloc
+
+canAttack                     Main     13.6    0.0
+winners.players               Main     11.3   20.7
+canCellAttack                 Main      9.7    0.0
+neighbours                    Main      7.8   18.7
+attackMoves                   Main      6.5    5.6
+canAttack.cell1               Main      6.2    0.0
+canAttack.cell2               Main      5.1    0.0
+neighbours.possibleNeighbours Main      4.7    9.1
+cellPositions                 Main      4.0   12.6
+allWinners                    Main      3.9    5.7
+gameTree                      Main      3.2    4.7
+makeAMove                     Main      2.9    6.4
+playerPositions               Main      2.8    3.0
+leaves.getLeaves              Main      2.7    5.5
+treeSize                      Main      2.7    4.2
+compare                       Main      1.7    0.0
+playerPositions.\             Main      1.6    0.0
+/=                            Main      1.5    0.0
+==                            Main      1.3    0.0
+
+
+                                                                                       individual     inherited
+COST CENTRE                           MODULE                         no.     entries  %time %alloc   %time %alloc
+
+MAIN                                  MAIN                            65           0    0.0    0.0   100.0  100.0
+ main                                 Main                           131           0    0.0    0.0   100.0  100.0
+  boardStats                          Main                           133           0    0.0    0.0   100.0  100.0
+   boardStats.winnersB                Main                           299           1    0.0    0.0     3.1    4.4
+    allWinners                        Main                           300           1    0.5    0.7     3.1    4.4
+     ==                               Main                           312       62887    0.0    0.0     0.0    0.0
+     allWinners.\                     Main                           311           2    0.0    0.0     0.0    0.0
+     compare                          Main                           310      606860    0.1    0.0     0.1    0.0
+     winners                          Main                           304       62888    0.1    0.1     2.0    3.0
+      winners.players                 Main                           306       62888    1.6    3.0     1.9    3.0
+       ==                             Main                           309      503104    0.1    0.0     0.1    0.0
+       player                         Main                           308      565992    0.2    0.0     0.2    0.0
+       compare                        Main                           307      992697    0.1    0.0     0.1    0.0
+      cells                           Main                           305       62888    0.0    0.0     0.0    0.0
+     currentBoard                     Main                           303       62888    0.0    0.0     0.0    0.0
+     leaves                           Main                           301           1    0.0    0.0     0.4    0.7
+      leaves.getLeaves                Main                           302      137339    0.4    0.7     0.4    0.7
+   show                               Main                           297           4    0.0    0.0     0.0    0.0
+   boardStats.winnersA                Main                           281           1    0.0    0.0    18.8   27.9
+    allWinners                        Main                           282           1    3.4    5.0    18.8   27.9
+     ==                               Main                           298      350685    0.0    0.0     0.0    0.0
+     allWinners.\                     Main                           296           2    0.0    0.0     0.0    0.0
+     compare                          Main                           295     4795733    0.6    0.0     0.6    0.0
+     winners                          Main                           287      350686    0.7    0.4    12.2   18.1
+      winners.players                 Main                           289      350686    9.7   17.7    11.5   17.7
+       ==                             Main                           292     2805488    0.3    0.0     0.3    0.0
+       player                         Main                           291     3156174    0.5    0.0     0.5    0.0
+       compare                        Main                           290     6337428    1.0    0.0     1.0    0.0
+      cells                           Main                           288      350686    0.0    0.0     0.0    0.0
+     currentBoard                     Main                           286      350686    0.3    0.0     0.3    0.0
+     leaves                           Main                           283           1    0.0    0.0     2.3    4.8
+      leaves.getLeaves                Main                           284      845109    2.3    4.8     2.3    4.8
+   boardStats.treeB                   Main                           221           1    0.0    0.0    10.5    8.9
+    gameTree                          Main                           223      167902    0.5    0.7    10.5    8.9
+     nextPlayer                       Main                           274       68669    0.0    0.0     0.0    0.0
+      numPlayers                      Main                           275       68669    0.0    0.0     0.0    0.0
+     reinforce                        Main                           266       68669    0.0    0.0     0.2    0.2
+      conqueredDice                   Main                           269       68669    0.0    0.0     0.0    0.0
+      reinforce.distributeDice        Main                           268      176370    0.1    0.2     0.1    0.2
+       maxDice                        Main                           279       52899    0.0    0.0     0.0    0.0
+       dice                           Main                           278      129139    0.0    0.0     0.0    0.0
+       player                         Main                           277      107701    0.0    0.0     0.0    0.0
+       ==                             Main                           276      107701    0.0    0.0     0.0    0.0
+      cells                           Main                           267       68669    0.0    0.0     0.0    0.0
+     makeAMove                        Main                           249       99232    0.5    0.9     1.0    1.5
+      dice                            Main                           273       68669    0.0    0.0     0.0    0.0
+      cells                           Main                           272       68669    0.0    0.0     0.0    0.0
+      makeAMove.destDice              Main                           271       68669    0.1    0.0     0.1    0.0
+      conqueredDice                   Main                           270       68669    0.0    0.0     0.0    0.0
+      makeAMove.srcDice               Main                           263       49404    0.0    0.0     0.0    0.0
+       dice                           Main                           265       49404    0.0    0.0     0.0    0.0
+       cells                          Main                           264       49404    0.0    0.0     0.0    0.0
+      makeAMove.afterAttack           Main                           262      618021    0.1    0.0     0.1    0.0
+      cellPositions                   Main                           260       68669    0.1    0.6     0.1    0.6
+       cells                          Main                           261       68669    0.0    0.0     0.0    0.0
+      canAttack                       Main                           250       68669    0.0    0.0     0.1    0.0
+       canCellAttack                  Main                           254       68669    0.1    0.0     0.1    0.0
+        dice                          Main                           259      137338    0.0    0.0     0.0    0.0
+        player                        Main                           257      137338    0.0    0.0     0.0    0.0
+        /=                            Main                           256       68669    0.0    0.0     0.0    0.0
+        ==                            Main                           255       68669    0.0    0.0     0.0    0.0
+       canAttack.cell2                Main                           253       68669    0.0    0.0     0.0    0.0
+       cells                          Main                           252      137338    0.0    0.0     0.0    0.0
+       canAttack.cell1                Main                           251       68669    0.0    0.0     0.0    0.0
+     ==                               Main                           248      167901    0.0    0.0     0.0    0.0
+     gameTree.addPassingMove          Main                           247       99233    0.0    0.0     0.0    0.0
+     gameTree.possibleMoves           Main                           224      137339    0.0    0.0     8.9    6.5
+      attackMoves                     Main                           225      137339    0.8    0.8     8.8    6.5
+       canAttack                      Main                           237     2197423    1.8    0.0     4.8    0.0
+        canCellAttack                 Main                           241     2197423    1.4    0.0     1.6    0.0
+         dice                         Main                           246     1200358    0.0    0.0     0.0    0.0
+         player                       Main                           244     4394846    0.0    0.0     0.0    0.0
+         /=                           Main                           243     2197423    0.2    0.0     0.2    0.0
+          ==                          Main                           245           0    0.0    0.0     0.0    0.0
+         ==                           Main                           242     2197423    0.0    0.0     0.0    0.0
+        canAttack.cell2               Main                           240     2197423    0.5    0.0     0.5    0.0
+        cells                         Main                           239     4394846    0.0    0.0     0.0    0.0
+        canAttack.cell1               Main                           238     2197423    0.9    0.0     0.9    0.0
+       size                           Main                           235      129872    0.0    0.0     0.0    0.0
+       neighbours                     Main                           232      618026    1.2    2.6     2.0    4.1
+        neighbours.down               Main                           236      618026    0.1    0.1     0.1    0.1
+        neighbours.up                 Main                           234      618026    0.1    0.1     0.1    0.1
+        neighbours.possibleNeighbours Main                           233      618026    0.7    1.3     0.7    1.3
+       playerPositions                Main                           226      137339    0.4    0.4     1.2    1.6
+        playerPositions.\             Main                           229     1236051    0.2    0.0     0.3    0.0
+         ==                           Main                           231     1236051    0.1    0.0     0.1    0.0
+         player                       Main                           230     1236051    0.0    0.0     0.0    0.0
+        cellPositions                 Main                           227      137339    0.4    1.2     0.4    1.2
+         cells                        Main                           228      137339    0.0    0.0     0.0    0.0
+    ==                                Main                           222           1    0.0    0.0     0.0    0.0
+   boardStats.numPlayerBNodes         Main                           219           1    0.0    0.0     0.5    0.6
+    treeSize                          Main                           220           0    0.5    0.6     0.5    0.6
+     treeSize.\                       Main                           280      137339    0.0    0.0     0.0    0.0
+   boardStats.treeA                   Main                           158           1    0.0    0.0    64.8   54.4
+    gameTree                          Main                           160      995090    2.8    4.0    64.8   54.4
+     nextPlayer                       Main                           216      422554    0.3    0.1     0.3    0.1
+      numPlayers                      Main                           217      422554    0.0    0.0     0.0    0.0
+     reinforce                        Main                           204      422554    0.3    0.2     1.0    0.7
+      conqueredDice                   Main                           207      422554    0.0    0.0     0.0    0.0
+      reinforce.distributeDice        Main                           206      753052    0.7    0.5     0.8    0.5
+       maxDice                        Main                           215      235171    0.0    0.0     0.0    0.0
+       dice                           Main                           214      452044    0.0    0.0     0.0    0.0
+       player                         Main                           213      330498    0.0    0.0     0.0    0.0
+       ==                             Main                           212      330498    0.1    0.0     0.1    0.0
+      cells                           Main                           205      422554    0.0    0.0     0.0    0.0
+     makeAMove                        Main                           187      572535    2.4    5.5     6.2    9.4
+      dice                            Main                           211      422554    0.0    0.0     0.0    0.0
+      cells                           Main                           210      422554    0.0    0.0     0.0    0.0
+      makeAMove.destDice              Main                           209      422554    0.3    0.0     0.3    0.0
+      conqueredDice                   Main                           208      422554    0.0    0.0     0.0    0.0
+      makeAMove.srcDice               Main                           201      348593    0.3    0.1     0.3    0.1
+       dice                           Main                           203      348593    0.0    0.0     0.0    0.0
+       cells                          Main                           202      348593    0.0    0.0     0.0    0.0
+      makeAMove.afterAttack           Main                           200     3802986    0.8    0.2     0.8    0.2
+      cellPositions                   Main                           198      422554    1.3    3.6     1.3    3.6
+       cells                          Main                           199      422554    0.0    0.0     0.0    0.0
+      canAttack                       Main                           188      422554    0.6    0.0     1.2    0.0
+       canCellAttack                  Main                           192      422554    0.3    0.0     0.4    0.0
+        dice                          Main                           197      845108    0.0    0.0     0.0    0.0
+        player                        Main                           195      845108    0.0    0.0     0.0    0.0
+        /=                            Main                           194      422554    0.1    0.0     0.1    0.0
+        ==                            Main                           193      422554    0.0    0.0     0.0    0.0
+       canAttack.cell2                Main                           191      422554    0.1    0.0     0.1    0.0
+       cells                          Main                           190      845108    0.0    0.0     0.0    0.0
+       canAttack.cell1                Main                           189      422554    0.2    0.0     0.2    0.0
+     ==                               Main                           186      995089    0.0    0.0     0.0    0.0
+     gameTree.addPassingMove          Main                           185      572536    0.0    0.0     0.0    0.0
+     gameTree.possibleMoves           Main                           161      845109    0.2    0.2    54.5   40.2
+      attackMoves                     Main                           162      845109    5.7    4.8    54.3   39.9
+       canAttack                      Main                           175    13521745   11.2    0.0    30.0    0.0
+        canCellAttack                 Main                           179    13521745    7.9    0.0     9.3    0.0
+         dice                         Main                           184    10983514    0.0    0.0     0.0    0.0
+         player                       Main                           182    27043490    0.0    0.0     0.0    0.0
+         /=                           Main                           181    13521745    1.3    0.0     1.3    0.0
+          ==                          Main                           183           0    0.0    0.0     0.0    0.0
+         ==                           Main                           180    13521745    0.0    0.0     0.0    0.0
+        canAttack.cell2               Main                           178    13521745    4.4    0.0     4.4    0.0
+        cells                         Main                           177    27043490    0.0    0.0     0.0    0.0
+        canAttack.cell1               Main                           176    13521745    5.1    0.0     5.1    0.0
+       size                           Main                           173      832836    0.1    0.0     0.1    0.0
+       neighbours                     Main                           170     3802990    6.6   16.1    11.8   25.3
+        neighbours.down               Main                           174     3802990    0.5    0.7     0.5    0.7
+        neighbours.up                 Main                           172     3802990    0.7    0.7     0.7    0.7
+        neighbours.possibleNeighbours Main                           171     3802990    4.0    7.8     4.0    7.8
+       playerPositions                Main                           163      845109    2.4    2.6     6.7    9.8
+        playerPositions.\             Main                           167     7605981    1.4    0.0     1.9    0.0
+         ==                           Main                           169     7605981    0.6    0.0     0.6    0.0
+         player                       Main                           168     7605981    0.0    0.0     0.0    0.0
+        cellPositions                 Main                           164      845109    2.2    7.2     2.4    7.2
+         cells                        Main                           166      845109    0.2    0.0     0.2    0.0
+    ==                                Main                           159           1    0.0    0.0     0.0    0.0
+   boardStats.numPlayerANodes         Main                           155           1    0.0    0.0     2.3    3.7
+    treeSize                          Main                           157           0    2.2    3.6     2.3    3.7
+     treeSize.\                       Main                           218      845109    0.1    0.2     0.1    0.2
+   drawBoard                          Main                           134           1    0.0    0.0     0.0    0.0
+    showBoard                         Main                           136           1    0.0    0.0     0.0    0.0
+     showBoard.showRow                Main                           142           3    0.0    0.0     0.0    0.0
+      showBoard.showCells             Main                           149           3    0.0    0.0     0.0    0.0
+       show                           Main                           150           9    0.0    0.0     0.0    0.0
+        dice                          Main                           153           9    0.0    0.0     0.0    0.0
+        show                          Main                           152           9    0.0    0.0     0.0    0.0
+        player                        Main                           151           9    0.0    0.0     0.0    0.0
+      showBoard.indent                Main                           143           3    0.0    0.0     0.0    0.0
+     showBoard.rows                   Main                           140           1    0.0    0.0     0.0    0.0
+      cells                           Main                           141           1    0.0    0.0     0.0    0.0
+     showBoard.rowNumbers             Main                           139           1    0.0    0.0     0.0    0.0
+     showBoard.boardSize              Main                           138           1    0.0    0.0     0.0    0.0
+     size                             Main                           137           1    0.0    0.0     0.0    0.0
+ CAF                                  Main                           129           0    0.0    0.0     0.0    0.0
+  cellPositions                       Main                           165           0    0.0    0.0     0.0    0.0
+  treeSize                            Main                           156           1    0.0    0.0     0.0    0.0
+  boardStats                          Main                           154           0    0.0    0.0     0.0    0.0
+  showBoard.showRow                   Main                           147           0    0.0    0.0     0.0    0.0
+   showBoard.indent                   Main                           148           0    0.0    0.0     0.0    0.0
+  showBoard                           Main                           144           0    0.0    0.0     0.0    0.0
+   showBoard.showRow                  Main                           145           0    0.0    0.0     0.0    0.0
+    showBoard.indent                  Main                           146           0    0.0    0.0     0.0    0.0
+  test3x3BoardB                       Main                           135           1    0.0    0.0     0.0    0.0
+  main                                Main                           130           1    0.0    0.0     0.0    0.0
+   boardStats                         Main                           132           1    0.0    0.0     0.0    0.0
+ CAF                                  Data.Time.LocalTime.TimeZone   121           0    0.0    0.0     0.0    0.0
+ CAF                                  GHC.Conc.Signal                113           0    0.0    0.0     0.0    0.0
+ CAF                                  GHC.IO.Encoding                105           0    0.0    0.0     0.0    0.0
+ CAF                                  GHC.IO.Encoding.Iconv          103           0    0.0    0.0     0.0    0.0
+ CAF                                  GHC.IO.Handle.FD                96           0    0.0    0.0     0.0    0.0
+ CAF                                  Text.Printf                     85           0    0.0    0.0     0.0    0.0
