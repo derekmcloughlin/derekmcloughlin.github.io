@@ -129,7 +129,7 @@ playAll2x2Boards :: IO ()
 playAll2x2Boards = mapM_ boardStats all2x2Boards
 {% endhighlight %}
 
-The results are given [here](2x2results-sorted.txt)
+The results are given [here]({{ site.url}}/images/2x2-results-sorted.txt)
 
 Most of these games are short or very one-sided. Interesting games
 are balanced ones, with a large number of nodes usually leading
