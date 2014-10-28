@@ -714,9 +714,69 @@ node into the parent itself, as an array of moves.
 {% highlight haskell %}
 data GameState = GameState {
                     currentPlayer :: Player,
-                    possibleMoves :: [Move],
+                    currentMoves :: [Move],
                     currentBoard :: Board
                  }
 {% endhighlight %}
+
+
+This changes the `gameTree` function slightly, in particular we don't
+need the `fromMove` parameter any more. Two other functions that change are
+`allowedMoves` that maps the possible moves to numbers, and `showGameGraphTree`
+used to generate the Graphviz output:
+
+{% highlight haskell %}
+gameTree :: Board -> Player -> Bool -> Tree GameState
+gameTree board p isFirstMove 
+    -- No further moves possible. Switch players and add the reinforcements
+    | null possibleMoves && not isFirstMove = 
+        Node GameState {
+            currentPlayer = p,
+            currentMoves = [Pass],
+            currentBoard = board
+        } passingGameTree
+    --  No moves possible - END OF GAME
+    | null possibleMoves && isFirstMove = 
+        Node GameState {
+            currentPlayer = p,
+            currentMoves = [Pass],
+            currentBoard = board
+        } []
+    -- Keeping with the same player, recurse through all moves                                              
+    | otherwise = 
+        Node GameState {
+            currentPlayer = p,
+            currentMoves = passingMove ++ possibleMoves,
+            currentBoard = board
+        } (passingGameTree
+          ++ 
+          [gameTree (makeAMove board p m) p False | m <- possibleMoves] 
+          )
+     where
+        possibleMoves = attackMoves board p
+        passingMove = if isFirstMove
+                        then []
+                        else [Pass]
+        passingGameTree = if isFirstMove
+                          then []
+                          else [gameTree
+                                 (reinforce board p)     -- Add reinforcements
+                                 (nextPlayer board p)    -- Switch player
+                                 True                    -- First move for new player
+                             ]
+
+allowedMoves :: Tree GameState -> [(Int, Move)]
+allowedMoves (Node root _) = zip [1..] $ currentMoves root 
+
+showGameGraphTree :: Tree (GameState, Int) -> String
+showGameGraphTree (Node (root, number) children) = 
+    concat $ [
+                printf "\"%d\" -> \"%d\" [label=\"%s\";];\n" 
+                        number child_number (show moveMade) :: String
+                | (moveMade, (Node (child, child_number) _)) <- zip (currentMoves root) children] ++
+             [showGameGraphTree c | c <- children] 
+{% endhighlight %}
+
+The code is in DiceOfDoom-i.hs.
 
 
