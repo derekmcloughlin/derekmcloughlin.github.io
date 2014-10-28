@@ -390,61 +390,15 @@ all subsequent 'cache hits' returned by the `game-tree` function
 are referenced, not copied, in the parent. While logically the structure 
 is a tree, several sub-trees share the same structure. In effect, 
 this turns the tree into a **Directed Acyclic Graph**. The 'magic' 
-behind this is the Lisp Cons Cell.
-
-### Lisp Cons Cells
-
-Lists in Lisp are linked lists. Each node in the list can point or refer to 
-another list. A list can have multiple references to the same list: here's
-a simple example:
-
-{% highlight lisp %}
-(defparameter *zero*    '("zero"))
-(defparameter *one*     '("one"))
-(defparameter *two*     '("two"))
-
-(defparameter *game-tree*
-    (list (get-node 1)
-          (get-node 2)
-          (get-node 0)
-          (get-node 1)
-          (get-node 2)))
-
-(defun get-node (node_number)
-    (cond ((eq 0 node_number)
-                *zero*)
-          ((eq 1 node_number)
-                *one*)
-          ((eq 2 node_number)
-                *two*)))
-{% endhighlight %}
-
-In CLisp:
-
-{% highlight lisp %}
-[1] *game-tree*
-(("one") ("two") ("zero") ("one") ("two"))
-{% endhighlight %}
-
-Lisp does allow mutation, so we can do the following:
-
-{% highlight lisp %}
-[2] (setf (car *one*) "une")
-"une"
-[3] *game-tree*
-(("une") ("two") ("zero") ("une") ("two"))
-{% endhighlight %}
-
-There's only one instance each of `*zero*`, `*one*` and `*two*` in the list.
-
-If you want to find more information on this, Peter Siebel's book 
+behind this is the Lisp Cons Cell. If you want to find more information on this, Peter Siebel's book 
 [Practical Common Lisp](http://www.gigamonkeys.com/book/), in particular 
 Chapter 12, 
 [They Called It Lisp For A Reason](http://www.gigamonkeys.com/book/they-called-it-lisp-for-a-reason-list-processing.html)
 is a good read.
 
 Haskell also has cons cells where we can have several items in a list referring
-to a single shared data structure.
+to a single shared data structure. Using this, we can memoise the game tree 
+creation in a similar way.
 
 ## Memoising Tree Creation
 
