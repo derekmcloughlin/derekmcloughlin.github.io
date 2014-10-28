@@ -602,22 +602,8 @@ process: take a function you want memoised, wrap it in another function that
 only calls it if it hasn't already been called with those arguments, and that
 stores the result for subsequent calls.
 
-The code in the Lisp solution does this dynamically - it renames the original
-function, creates a new function on the fly with the same name as the original
-function, and wraps it up using a hash table to store the calculated results.
-
-{% highlight lisp %}
-let ((old-game-tree (symbol-function 'game-tree))
-      (previous (make-hash-table :test #'equalp)))
-  (defun game-tree (&rest rest)
-    (or (gethash rest previous)
-      (setf (gethash rest previous) (apply old-game-tree rest)))))
-{% endhighlight %}
-
-It's quite elegant.
-
 Haskell doesn't allow mutation directly, so we have to use some sort of
-state mechanism. The approach we'll use is taken from 
+state mechanism. The approach we'll use is described in
 [http://www.maztravel.com/haskell/memofib.html](http://www.maztravel.com/haskell/memofib.html) 
 by Henry Laxen, who in turn got it from the 
 [Haskell Cafe]( https://groups.google.com/forum/#!topic/comp.lang.haskell/iXA6Wq1SPcU).
@@ -796,11 +782,24 @@ data GameState = GameState {
 {% endhighlight %}
 
 We stored the `moveMade` in the game state to tell us that a particular
-move was made to get to this state. However, several different moves 
-from different boards can result in the same end state. If we want to 
-memoise the game tree from a possible board, we need to remove the `moveMade`
-reference and put this into the parent. The game state should only have
-the current player, the current board, and the list of possible moves
-from that board.
+move was made to get to this state. It made it easy to enumerate the 
+child nodes and see what move would result in that board.
+
+However, several different moves from different boards can result in the 
+same end state. If we want to memoise the game tree from a possible board, 
+we need to remove the `moveMade` reference and put this into the parent. The 
+game state should only have the current player, the current board, and 
+the list of possible moves from that board.
+
+To do this we're going to put the moves made from a parent node to a child
+node into the parent itself, as an array of moves.
+
+{% highlight haskell %}
+data GameState = GameState {
+                    currentPlayer :: Player,
+                    possibleMoves :: [Move],
+                    currentBoard :: Board
+                 }
+{% endhighlight %}
 
 
