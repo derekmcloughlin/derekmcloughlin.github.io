@@ -549,7 +549,7 @@ Our goal is to:
 * Reduce the amount of memory used by the tree.
 * Reduce the time taken to construct it.
 
-### Memoising
+### A General-Purpose Memoising Function
 
 In languages that allow mutation, memoising is a fairly straightforward
 process: take a function you want memoised, wrap it in another function that
