@@ -22,40 +22,11 @@ is (2*3)^(N\*N). A 2x2 game has 1,296 possible
 boards, while a 3x3 one has 10,077,696. A 4x4 game has 2,821,109,907,456 
 possible configurations - that's over two trillion!
 
-It's important to note that the game can never reach a stalemate e.g.
-where player A passes, then player B passes, then player A passes again. This
-is because the player must make a move at the start of their turn. If they 
-can't then the game ends.  We also can't get stalemate situations where a 
-succession of moves by A and B result in the same board that A started 
-with. This is because the number of dice decreases as time goes on - not all 
-the conquered dice are returned to the board.
-
 For the 2x2 boards, we can generate game trees for all scenarios and look
 at some stats, depending on whether A starts or B starts:
 
 * The number of nodes in the tree.
 * The eventual winners in each tree.
-
-To help with this it's useful to check whether the Lisp code gives the same
-results. Here are some helper functions that we can run in CLisp:
-
-{% highlight lisp %}
-(defun tree-size (tree)
-  (let ((moves (caddr tree)))
-    (+ 1 (if moves
-           (apply #'+ (get-tree-size tree))
-           0))))
-
-(defun get-tree-size (tree)
-  (mapcar (lambda (move)
-    (tree-size (cadr move)))
-  (caddr tree)))
-
-(defun all-winners (tree)
-TODO
-{% endhighlight %}
-
-The equivalents in Haskell:
 
 {% highlight haskell %}
 treeSize :: Tree a -> Int
@@ -141,7 +112,7 @@ possible boards, but take a few random ones and play them.
 **Note**: GHC vs GHCi
 
 Whenever you're doing performance work I recommend you compile your code
-with optimisations switched on, rather than run it through GHCi. To do this
+with optimisations switched on, rather than running it through GHCi. To do this
 we'll need to add a `main` function and change the module name to "Main".
 
 {% highlight haskell %}
@@ -283,15 +254,6 @@ treeSize = F.foldl' (\x _ -> x + 1) 0
 See the [WikiBooks](http://www.haskell.org/haskellwiki/Foldr_Foldl_Foldl') 
 entry for more information on this.
 
-
-TODO: better explanation 
-
-
-Such large trees pose two separate problems for us:
-
-* It takes a long time to go through the whole tree.
-* It takes up a lot of memory.
-
 ### Aside: Profiling an Application
 
 Before we second-guess the performance issues in the game, it's good to get
@@ -390,7 +352,8 @@ all subsequent 'cache hits' returned by the `game-tree` function
 are referenced, not copied, in the parent. While logically the structure 
 is a tree, several sub-trees share the same structure. In effect, 
 this turns the tree into a **Directed Acyclic Graph**. The 'magic' 
-behind this is the Lisp Cons Cell. If you want to find more information on this, Peter Siebel's book 
+behind this is the Lisp Cons Cell. If you want to find more information on 
+this, Peter Siebel's book 
 [Practical Common Lisp](http://www.gigamonkeys.com/book/), in particular 
 Chapter 12, 
 [They Called It Lisp For A Reason](http://www.gigamonkeys.com/book/they-called-it-lisp-for-a-reason-list-processing.html)
