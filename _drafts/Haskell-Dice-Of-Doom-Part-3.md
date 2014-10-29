@@ -18,7 +18,7 @@ boards bigger than 2x2.
 Before doing anything we should look at the performance characteristics of the 
 game, in particular the size of the problem. For an N x N board with 2 players 
 and a max of 3 dice per cell, the number of board configurations 
-is (2*3)^(N\*N). A 2x2 game has 1,296 possible 
+is (2*3)^(N*N). A 2x2 game has 1,296 possible 
 boards, while a 3x3 one has 10,077,696. A 4x4 game has 2,821,109,907,456 
 possible configurations - that's over two trillion!
 
@@ -186,22 +186,8 @@ that the max tree size I should be able to accomodate in memory is one
 with 80 million nodes. So how could I calculate the size of the above game
 tree?
 
-The answer is that, entirely by accident, I used properties
-of Haskell's laziness and the garbage collector.
-
-### Haskell Laziness and Garbage Collection
-
-When I wrote the initial code for `treeSize` I did the simplest thing 
-possible:
-
-{% highlight haskell %}
-treeSize :: Tree a -> Int
-treeSize = length . flatten
-{% endhighlight %}
-
-I reckoned that this would be horribly inefficient, but that it would do me
-for a while. I initially only wanted to know the tree sizes, so my main 
-function was like this:
+The answer is garbage collection. I initially only wanted to know the 
+tree sizes, so my main function was like this:
 
 {% highlight haskell %}
 main :: IO ()
@@ -230,7 +216,20 @@ The impressive thing was that it ran in constant memory. Looking at the
 process stats in Mac OS X's Activity Monitor, the private memory usage
 never got above 2.5 MB.
 
-Buoyed on by this, I went back to "fix" the problem with `treeSize`:
+Buoyed on by this, I added more stats, including the winners. Re-running, 
+it didn't take long before I consumed all available memory.
+
+The reason for this is that if I just get the tree size, unused nodes are
+garbage collected. However, if I need the tree for separate calls to get
+the size and the winners, the nodes can't be garbage collected before the
+second call, and the whole tree resides in memory.
+
+### Aside: Calculating the Size of the Tree
+
+The initial version of `treeSize` flattens the entire tree and then gets it's
+length. I thought this would be horribly ineffieicent, but that it would
+do me for a while. After getting an initial set of stats, I resolved to 'fix'
+the issue with `treeSize`:
 
 {% highlight haskell %}
 import qualified Data.Foldable as F
@@ -239,7 +238,8 @@ treeSize :: Tree a -> Int
 treeSize = F.foldl (\x _ -> x + 1) 0 
 {% endhighlight %}
 
-Re-running, it didn't take long before I consumed all available memory.
+Re-running this on a large tree (several million nodes) resulted in all
+memory being consumed.
 
 The problem here is with the `foldl` function. It's much better to use
 `foldl'`. 
@@ -254,29 +254,13 @@ treeSize = F.foldl' (\x _ -> x + 1) 0
 See the [WikiBooks](http://www.haskell.org/haskellwiki/Foldr_Foldl_Foldl') 
 entry for more information on this.
 
-### Aside: Profiling an Application
-
-Before we second-guess the performance issues in the game, it's good to get
-a real idea of where the bottlenecks lie by profiling it.
-
-GHC allows us to turn on profiling:
+Even with this, the function wasn't as fast as the flattening one. I finally 
+settled on the following simple function, which turns out to be faster still:
 
 {% highlight haskell %}
-ghc -O2 -prof -auto-all DiceOfDoom-h.hs
+treeSize :: Tree a -> Integer
+treeSize (Node _ children) = 1 + sum (map treeSize children)
 {% endhighlight %}
-
-To run, we need to tell the GHC runtime that we want do do the profiling:
-(This test was done using test3x3BoardB)
-
-{% highlight haskell %}
-./DiceOfDoom-h +RTS -p
-{% endhighlight %}
-
-The profiling output is stored in DiceOfDoom-h.prof.
-
-[test3x3BoardB]({{ site.url }}/images/test3x3BoardB.txt)
-
-[test3x3BoardC](test3x3BoardC.txt)
 
 ## Shared Structure
 
@@ -363,10 +347,34 @@ Haskell also has cons cells where we can have several items in a list referring
 to a single shared data structure. Using this, we can memoise the game tree 
 creation in a similar way.
 
+### Aside: Profiling an Application
+
+Before we second-guess the performance issues in the game, it's good to get
+a real idea of where the bottlenecks lie by profiling it.
+
+GHC allows us to turn on profiling:
+
+{% highlight haskell %}
+ghc -O2 -prof -auto-all DiceOfDoom-h.hs
+{% endhighlight %}
+
+To run, we need to tell the GHC runtime that we want do do the profiling:
+(This test was done using test3x3BoardB)
+
+{% highlight haskell %}
+./DiceOfDoom-h +RTS -p
+{% endhighlight %}
+
+The profiling output is stored in DiceOfDoom-h.prof.
+
+[test3x3BoardB]({{ site.url }}/images/test3x3BoardB.txt)
+
+[test3x3BoardC](test3x3BoardC.txt)
+
 ## Memoising Tree Creation
 
-To see this in practice, let's play around with trees in a very contrived 
-scenario.
+To see the shared structure in practice, let's play around with trees using 
+a very contrived scenario.
 
 Suppose we have the following tree:
 
@@ -415,29 +423,27 @@ main = do
         tree = mkTree 0
 {% endhighlight %}
 
-Let's make the tree size much bigger - a width of 60 and a height of 9. Compiling
-this with optimisations on:
-
-TODO: rename file.
+Let's make the tree size much bigger - a width of 60 and a height of 9. 
+Compiling this with optimisations on:
 
 {% highlight text %}
-ghc -O2 treetest6.hs
-time ./treetest6
+ghc -O2 treetest1.hs
+time ./treetest1
 Tree size = 26359321
 Tree count = 6002442090
-./treetest6  17.23s user 7.21s system 91% cpu 26.666 total
+./treetest1  17.23s user 7.21s system 91% cpu 26.666 total
 {% endhighlight %}
 
 It's more interesting to compile with profiling switched on:
 
 {% highlight text %}
-ghc -O2 -prof -auto-all treetest6.hs
+ghc -O2 -prof -auto-all treetest1.hs
 {% endhighlight %}
 
-We'll run with the profiling output plus the garbage collector stats.
+We'll run with the profiling output (-p) plus the garbage collector stats (-s).
 
 {% highlight text %}
-./treetest6 +RTS -s -p
+./treetest1 +RTS -s -p
 Tree size = 26359321
 Tree count = 6002442090
   16,576,601,784 bytes allocated in the heap
@@ -470,7 +476,7 @@ The profiling info is:
 {% highlight text %}
     Mon Oct 27 18:39 2014 Time and Allocation Profiling Report  (Final)
 
-       treetest6 +RTS -s -p -RTS
+       treetest1 +RTS -s -p -RTS
 
     total time  =       10.21 secs   (10209 ticks @ 1000 us, 1 processor)
     total alloc = 9,818,026,808 bytes  (excludes profiling overheads)
@@ -522,7 +528,7 @@ stores the result for subsequent calls.
 Haskell doesn't allow mutation directly, so we have to use some sort of
 state mechanism. The approach we'll use is described in
 [http://www.maztravel.com/haskell/memofib.html](http://www.maztravel.com/haskell/memofib.html) 
-by Henry Laxen, who in turn got it from the 
+and
 [Haskell Cafe]( https://groups.google.com/forum/#!topic/comp.lang.haskell/iXA6Wq1SPcU).
 
 In some ways the approach is similar to the Lisp one above: we
@@ -590,11 +596,11 @@ the Lisp version keeps it's state across invocations.
 Let's run this to see what effect it has on space and time:
 
 {% highlight text %}
-ghc -O2 treetest7.hs
-time ./treetest7
+ghc -O2 treetest2.hs
+time ./treetest2
 Tree size = 26359321
 Tree count = 6002442090
-./treetest7  4.68s user 0.07s system 99% cpu 4.768 total
+./treetest2  4.68s user 0.07s system 99% cpu 4.768 total
 {% endhighlight %}
 
 That's much quicker than the non-memoised version.
@@ -602,13 +608,13 @@ That's much quicker than the non-memoised version.
 What about the profiling stats?
 
 {% highlight text %}
-ghc -O2 -prof -auto-all treetest6.hs
+ghc -O2 -prof -auto-all treetest1.hs
 {% endhighlight %}
 
 We'll run with the profiling output plus the garbage collector stats.
 
 {% highlight text %}
-./treetest7 +RTS -s -p
+./treetest2 +RTS -s -p
 Tree size = 26359321
 Tree count = 6002442090
   10,544,394,352 bytes allocated in the heap
@@ -645,7 +651,7 @@ The profiling info is:
 {% highlight text %}
 	Mon Oct 27 19:11 2014 Time and Allocation Profiling Report  (Final)
 
-	   treetest7 +RTS -s -p -RTS
+	   treetest2 +RTS -s -p -RTS
 
 	total time  =        4.41 secs   (4412 ticks @ 1000 us, 1 processor)
 	total alloc = 6,326,664,144 bytes  (excludes profiling overheads)
@@ -687,7 +693,7 @@ We can see that the number of calls to the memomised function `mkTreeM` is
 ### Applying Memoisation to the Game Tree
 
 We can use this same memoisation technique for constructing the game tree.
-However, we have a bit of a flaw in the way we designed the tree, and this
+However, we have a flaw in the way we designed the tree, and this
 will get in the way of memoisation. Recall that the game state is defined by:
 
 {% highlight haskell %}
@@ -718,7 +724,6 @@ data GameState = GameState {
                     currentBoard :: Board
                  }
 {% endhighlight %}
-
 
 This changes the `gameTree` function slightly, in particular we don't
 need the `fromMove` parameter any more. Two other functions that change are
