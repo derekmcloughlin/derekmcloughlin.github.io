@@ -539,7 +539,7 @@ to enable us to memoise it.
 Here's the memoised version of `mkTree`:
 
 {% highlight haskell %}
-import Data.Map as Map
+import qualified Data.Map as M
 import Control.Monad.State.Lazy as State
 
 type IntTree = Tree Integer
