@@ -690,7 +690,26 @@ We can see that the number of calls to the memomised function `mkTreeM` is
 245, which is the number of unique nodes in the DAG. This compares to 
 26359321, the size of the tree, for the non-memoised function.
 
+**NOTE** It's important to note that the type of memoisation presented here
+is slightly different to what you'd expect if you were memoising functions
+in Python or Ruby. In the Haskell memoisation code above, the memoisation
+only works within recursive calls to the same function. It doesn't work
+across non-recursive calls. So if you're in GHCI and you do the following:
+
+{% highlight text %}
+ghci> treeSize $ mkTree 0
+26359321
+ghci> treeSize $ mkTree 0
+26359321
+{% endhighlight %}
+
+Then the second call to `mkTree` isn't "cached" in any way - it goes through
+exactly the same process of trying to memoise recursive calls to itself
+starting off with an empty map.
+
 ### Applying Memoisation to the Game Tree
+
+#### Fixing a Design Flaw
 
 We can use this same memoisation technique for constructing the game tree.
 However, we have a flaw in the way we designed the tree, and this
@@ -785,3 +804,62 @@ showGameGraphTree (Node (root, number) children) =
 The code is in DiceOfDoom-i.hs.
 
 
+#### Setting up the Map
+
+In order to memoize the calls to `gameTree` using the method above, we'll 
+need to be able to map a single something to a game tree. The `gametree` 
+function takes three parameters: a board, a player and a boolean indicating
+if it's the first move or not. We'll wrap these three items in a single tuple.
+The structure of the code remains the same as the non-memoizing version:
+
+{% highlight haskell %}
+type GameTree = Tree GameState
+
+gameTree :: Board -> Player -> Bool -> GameTree
+gameTree board p isFirstMove = memoizeM gameTreeM (board, p, isFirstMove)
+
+gameTreeM :: Monad m => 
+    ((Board, Player, Bool) -> m GameTree) -> (Board, Player, Bool) -> m GameTree
+gameTreeM f' (board, p, isFirstMove)
+    -- No further moves possible. Switch players and add the reinforcements
+    | null possibleMoves && not isFirstMove = do
+            passTree <- f' ((reinforce board p),    -- Add reinforcements
+                             (nextPlayer board p),  -- Switch player
+                             True)                  -- First move for new player
+            return $ Node GameState {
+                    currentPlayer = p,
+                    currentMoves = [Pass],
+                    currentBoard = board
+                 } [passTree]
+    --  No moves possible - END OF GAME
+    | null possibleMoves && isFirstMove = do
+            return $ Node GameState {
+                    currentPlayer = p,
+                    currentMoves = [Pass],
+                    currentBoard = board
+                 } []
+    -- Keeping with the same player, recurse through all moves                                              
+    | otherwise = do
+        childTrees <- mapM (\b -> f' (b, p, False)) [makeAMove board p m | m <- possibleMoves] 
+        if isFirstMove
+            then do
+                return $ Node GameState {
+                            currentPlayer = p,
+                            currentMoves = possibleMoves,
+                            currentBoard = board
+                         } (childTrees)
+            else do
+                passTree <- f' ((reinforce board p),    -- Add reinforcements
+                                 (nextPlayer board p),  -- Switch player
+                                 True)                  -- First move for new player
+                return $ Node GameState {
+                            currentPlayer = p,
+                            currentMoves = Pass : possibleMoves,
+                            currentBoard = board
+                         } (passTree : childTrees)
+     where
+        possibleMoves = attackMoves board p
+{% endhighlight %}
+
+
+Code in DiceOfDoom-k.hs.    -- TODO: rename
