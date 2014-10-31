@@ -804,7 +804,7 @@ showGameGraphTree (Node (root, number) children) =
 The code is in DiceOfDoom-i.hs.
 
 
-#### Setting up the Map
+#### Setting up the Memoising Map
 
 In order to memoize the calls to `gameTree` using the method above, we'll 
 need to be able to map a single something to a game tree. The `gametree` 
@@ -861,5 +861,31 @@ gameTreeM f' (board, p, isFirstMove)
         possibleMoves = attackMoves board p
 {% endhighlight %}
 
-
 Code in DiceOfDoom-k.hs.    -- TODO: rename
+
+Let's test this out on the 1.4 billion-node game tree:
+
+
+{% highlight haskell %}
+main :: IO ()
+main = do
+    t1 <- getCurrentTime
+    print t1
+    putStrLn $ printf "Size: %d" (treeSize tree) 
+    putStrLn $ printf "Depth: %d" (treeDepth tree) 
+    t2 <- getCurrentTime
+    print t2
+    where
+        tree = gameTree test3x3BoardE (Player 0) True
+
+
+$ ghc -O2 DiceOfDoom-k.hs
+$ ./DiceOfDoom-k
+2014-10-31 09:21:49.2206886 UTC
+Size: 1468919491
+Depth: 40
+2014-10-31 09:23:28.837608 UTC
+{% endhighlight %}
+
+One minute and 40 seconds - that's not bad. Memory usage peaks at 98MB.
+
