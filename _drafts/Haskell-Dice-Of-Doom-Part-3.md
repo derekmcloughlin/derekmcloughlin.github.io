@@ -186,8 +186,8 @@ that the max tree size I should be able to accomodate in memory is one
 with 80 million nodes. So how could I calculate the size of the above game
 tree?
 
-The answer is garbage collection. I initially only wanted to know the 
-tree sizes, so my main function was like this:
+The answer is laziness and garbage collection. I initially only wanted to know 
+the tree sizes, so my main function was like this:
 
 {% highlight haskell %}
 main :: IO ()
@@ -220,8 +220,10 @@ Buoyed on by this, I added more stats, including the winners. Re-running,
 it didn't take long before I consumed all available memory.
 
 The reason for this is that if I just get the tree size, unused nodes are
-garbage collected. However, if I need the tree for separate calls to get
-the size and the winners, the nodes can't be garbage collected before the
+garbage collected. I don't need to generate the whole tree up-front to start
+calculating the tree size - laziness helps here. However, if I need the tree for 
+separate calls to get the size and the winners, the nodes can't be garbage 
+collected before the
 second call, and the whole tree resides in memory.
 
 ### Aside: Calculating the Size of the Tree
@@ -358,7 +360,8 @@ GHC allows us to turn on profiling:
 ghc -O2 -prof -auto-all DiceOfDoom-h.hs
 {% endhighlight %}
 
-To run, we need to tell the GHC runtime that we want do do the profiling:
+To run, we need to tell the GHC runtime that we want do do the profiling (-p)
+and that we want garbage collection stats as well (-s):
 (This test was done using test3x3BoardB)
 
 {% highlight haskell %}
@@ -371,140 +374,7 @@ The profiling output is stored in DiceOfDoom-h.prof.
 
 [test3x3BoardC](test3x3BoardC.txt)
 
-## Memoising Tree Creation
-
-To see the shared structure in practice, let's play around with trees using 
-a very contrived scenario.
-
-Suppose we have the following tree:
-
-<img src="{{ site.url }}/images/contrived.svg" alt="Drawing" style="width: 500px;"/>
-
-There are 19 unique nodes in the DAG, but 311 nodes in the tree.
-
-Let's say that this tree has a width of 5 (max number of nodes across)
-and a depth of 7. 
-
-Here's some Haskell code to generate such a tree, as well as some utility
-functions to find the tree size and a count of the value of each node.
-
-{% highlight haskell %}
-module Main
-where
-
-import Data.Tree
-
-treeWidth :: Integer
-treeWidth = 5
-
-treeDepth :: Integer
-treeDepth = 7   -- Must be odd.
-
-treeSize :: Tree a -> Integer
-treeSize (Node _ children) = 1 + sum (map treeSize children)
-
-treeCount :: Tree Integer -> Integer
-treeCount (Node root children) = root + sum (map treeCount children)
-
-mkTree :: Integer -> Tree Integer
-mkTree n 
-    | n >= (treeDepth `div` 2) * (treeWidth + 1) 
-        = Node n []
-    | n `mod` (treeWidth + 1) == 0 
-        = Node n [mkTree (n + c) | c <- [1 .. treeWidth] ] 
-    | otherwise 
-        = Node n [mkTree (((n `div` (treeWidth + 1)) + 1) * (treeWidth + 1))] 
-
-main :: IO ()
-main = do
-    putStrLn ("Tree size = " ++ show (treeSize tree))
-    putStrLn ("Tree count = " ++ show (treeCount tree))
-    where 
-        tree = mkTree 0
-{% endhighlight %}
-
-Let's make the tree size much bigger - a width of 60 and a height of 9. 
-Compiling this with optimisations on:
-
-{% highlight text %}
-ghc -O2 treetest1.hs
-time ./treetest1
-Tree size = 26359321
-Tree count = 6002442090
-./treetest1  17.23s user 7.21s system 91% cpu 26.666 total
-{% endhighlight %}
-
-It's more interesting to compile with profiling switched on:
-
-{% highlight text %}
-ghc -O2 -prof -auto-all treetest1.hs
-{% endhighlight %}
-
-We'll run with the profiling output (-p) plus the garbage collector stats (-s).
-
-{% highlight text %}
-./treetest1 +RTS -s -p
-Tree size = 26359321
-Tree count = 6002442090
-  16,576,601,784 bytes allocated in the heap
-   8,685,498,016 bytes copied during GC
-   2,836,646,040 bytes maximum residency (14 sample(s))
-      21,969,480 bytes maximum slop
-            5535 MB total memory in use (0 MB lost due to fragmentation)
-
-                                    Tot time (elapsed)  Avg pause  Max pause
-  Gen  0     32012 colls,     0 par    2.63s    2.80s     0.0001s    0.0478s
-  Gen  1        14 colls,     0 par    5.80s   11.80s     0.8429s    5.8293s
-
-  INIT    time    0.00s  (  0.00s elapsed)
-  MUT     time    8.76s  (  9.51s elapsed)
-  GC      time    8.43s  ( 14.60s elapsed)
-  RP      time    0.00s  (  0.00s elapsed)
-  PROF    time    0.00s  (  0.00s elapsed)
-  EXIT    time    0.06s  (  0.94s elapsed)
-  Total   time   17.25s  ( 25.06s elapsed)
-
-  %GC     time      48.9%  (58.3% elapsed)
-
-  Alloc rate    1,892,048,682 bytes per MUT second
-
-  Productivity  51.1% of total user, 35.2% of total elapsed
-{% endhighlight %}
-
-The profiling info is:
-
-{% highlight text %}
-    Mon Oct 27 18:39 2014 Time and Allocation Profiling Report  (Final)
-
-       treetest1 +RTS -s -p -RTS
-
-    total time  =       10.21 secs   (10209 ticks @ 1000 us, 1 processor)
-    total alloc = 9,818,026,808 bytes  (excludes profiling overheads)
-
-COST CENTRE MODULE  %time %alloc
-
-treeCount   Main     47.9   32.2
-mkTree      Main     30.4   35.6
-treeSize    Main     21.7   32.2
-
-COST CENTRE  MODULE                  no.     entries  %time %alloc   %time %alloc
-
-MAIN         MAIN                     46           0    0.0    0.0   100.0  100.0
- main        Main                     93           0    0.0    0.0     0.0    0.0
- CAF         Main                     91           0    0.0    0.0   100.0  100.0
-  treeWidth  Main                     98           1    0.0    0.0     0.0    0.0
-  treeDepth  Main                     97           1    0.0    0.0     0.0    0.0
-  mkTree     Main                     96           0    0.0    0.0     0.0    0.0
-  main       Main                     92           1    0.0    0.0   100.0  100.0
-   treeCount Main                    100    26359321   47.9   32.2    47.9   32.2
-   treeSize  Main                     99    26359321   21.7   32.2    21.7   32.2
-   main.tree Main                     94           1    0.0    0.0    30.4   35.6
-    mkTree   Main                     95    26359321   30.4   35.6    30.4   35.6
- CAF         GHC.Conc.Signal          86           0    0.0    0.0     0.0    0.0
- CAF         GHC.IO.Encoding          79           0    0.0    0.0     0.0    0.0
- CAF         GHC.IO.Encoding.Iconv    77           0    0.0    0.0     0.0    0.0
- CAF         GHC.IO.Handle.FD         70           0    0.0    0.0     0.0    0.0
-{% endhighlight %}
+TODO: Add the GC stats.
 
 For info on the interpretation of GC stats, see 
 [Running a compiled program](http://www.haskell.org/ghc/docs/7.8.3/html/users_guide/runtime-control.html)
@@ -518,7 +388,8 @@ Our goal is to:
 * Reduce the amount of memory used by the tree.
 * Reduce the time taken to construct it.
 
-### A General-Purpose Memoising Function
+
+## Memoising Tree Creation
 
 In languages that allow mutation, memoising is a fairly straightforward
 process: take a function you want memoised, wrap it in another function that
@@ -536,160 +407,6 @@ have a function that stores calculated values in a map. However, we can't just
 wrap the old function in another one - we have to modify the old function
 to enable us to memoise it.
 
-Here's the memoised version of `mkTree`:
-
-{% highlight haskell %}
-import qualified Data.Map as M
-import Control.Monad.State.Lazy as State
-
-type IntTree = Tree Integer
-
-mkTree :: Integer -> IntTree 
-mkTree = memoizeM mkTreeM
-
-mkTreeM :: Monad m => (Integer -> m IntTree) -> Integer -> m IntTree
-mkTreeM f' n 
-    | n >= (treeDepth `div` 2) * (treeWidth + 1)
-        = return $ Node n []
-    | n `mod` (treeWidth + 1) == 0
-        = do
-            cs <- mapM f' [n + c | c <- [1 .. treeWidth] ]
-            return $ Node n cs
-    | otherwise 
-        = do
-            cs <- mapM f' [((n `div` (treeWidth + 1)) + 1) * (treeWidth + 1)]
-            return $ Node n cs
-
-type StateMap a b = State (M.Map a b) b
- 
-memoizeM :: (Show a, Show b, Ord a) => 
-            ((a -> StateMap a b) -> (a -> StateMap a b)) -> (a -> b)
-memoizeM t x = evalState (f x) M.empty 
-    where
-        -- Cache miss
-        g z = do
-            y <- t f z  
-            m <- get
-            put $ M.insert z y m
-            return y
-        -- Cache hit
-        f z = get >>= \m -> maybe (g z) return (M.lookup z m)
-{% endhighlight %}
-
-The caclulated results are stored in a `StateMap`, which is a mapping in our
-case of an integer to a tree of integers, which is then wrapped up in the
-`State` monad. When memomising a function, we evaluate the state of the 
-function `f` initialised with an empty map. `f` then looks up the value in
-the map. If it's found, that value is returned. Otherwise, we call function
-`g`, which performs the actual calulation and stores the result in the map
-and then returns the value.
-
-When running this for the first time, it's useful to keep the `trace`
-calls in the code as 
-[Henry has done](http://www.maztravel.com/haskell/memofib.html#memoize).
-That way you can see the state of the map on each call.
-
-One major difference between this code and the Lisp version is that the
-Haskell memoisation only lasts for the duration of the call, whereas 
-the Lisp version keeps it's state across invocations.
-
-Let's run this to see what effect it has on space and time:
-
-{% highlight text %}
-ghc -O2 treetest2.hs
-time ./treetest2
-Tree size = 26359321
-Tree count = 6002442090
-./treetest2  4.68s user 0.07s system 99% cpu 4.768 total
-{% endhighlight %}
-
-That's much quicker than the non-memoised version.
-
-What about the profiling stats?
-
-{% highlight text %}
-ghc -O2 -prof -auto-all treetest1.hs
-{% endhighlight %}
-
-We'll run with the profiling output plus the garbage collector stats.
-
-{% highlight text %}
-./treetest2 +RTS -s -p
-Tree size = 26359321
-Tree count = 6002442090
-  10,544,394,352 bytes allocated in the heap
-      10,321,960 bytes copied during GC
-         116,104 bytes maximum residency (4 sample(s))
-          27,456 bytes maximum slop
-               2 MB total memory in use (0 MB lost due to fragmentation)
-
-                                    Tot time (elapsed)  Avg pause  Max pause
-  Gen  0     20586 colls,     0 par    0.09s    0.12s     0.0000s    0.0001s
-  Gen  1         4 colls,     0 par    0.00s    0.00s     0.0002s    0.0003s
-
-  INIT    time    0.00s  (  0.00s elapsed)
-  MUT     time    4.39s  (  4.46s elapsed)
-  GC      time    0.09s  (  0.12s elapsed)
-  RP      time    0.00s  (  0.00s elapsed)
-  PROF    time    0.00s  (  0.00s elapsed)
-  EXIT    time    0.00s  (  0.00s elapsed)
-  Total   time    4.48s  (  4.58s elapsed)
-
-  %GC     time       2.0%  (2.6% elapsed)
-
-  Alloc rate    2,400,859,384 bytes per MUT second
-
-  Productivity  98.0% of total user, 96.0% of total elapsed
-{% endhighlight %}
-
-Just look at the difference in garbage collection - only 10MB copied here
-vs. 8GB in the first version! Also note that only a tiny fraction of time
-is spent in GC - 2% vs. 48%.
-
-The profiling info is:
-
-{% highlight text %}
-	Mon Oct 27 19:11 2014 Time and Allocation Profiling Report  (Final)
-
-	   treetest2 +RTS -s -p -RTS
-
-	total time  =        4.41 secs   (4412 ticks @ 1000 us, 1 processor)
-	total alloc = 6,326,664,144 bytes  (excludes profiling overheads)
-
-COST CENTRE MODULE  %time %alloc
-
-treeSize    Main     51.0   50.0
-treeCount   Main     49.0   50.0
-
-COST CENTRE         MODULE                  no.     entries  %time %alloc   %time %alloc
-
-MAIN                MAIN                     47           0    0.0    0.0   100.0  100.0
- main               Main                     95           0    0.0    0.0     0.0    0.0
- CAF                Main                     93           0    0.0    0.0   100.0  100.0
-  treeWidth         Main                    106           1    0.0    0.0     0.0    0.0
-  treeDepth         Main                    105           1    0.0    0.0     0.0    0.0
-  mkTreeM           Main                    104           0    0.0    0.0     0.0    0.0
-  mkTree            Main                     97           1    0.0    0.0     0.0    0.0
-  main              Main                     94           1    0.0    0.0   100.0  100.0
-   treeCount        Main                    108    26359321   49.0   50.0    49.0   50.0
-   treeSize         Main                    107    26359321   51.0   50.0    51.0   50.0
-   main.tree        Main                     96           1    0.0    0.0     0.0    0.0
-    mkTree          Main                     98           0    0.0    0.0     0.0    0.0
-     memoizeM       Main                     99           1    0.0    0.0     0.0    0.0
-      memoizeM.f    Main                    100         481    0.0    0.0     0.0    0.0
-       memoizeM.f.\ Main                    101         481    0.0    0.0     0.0    0.0
-        memoizeM.g  Main                    102         245    0.0    0.0     0.0    0.0
-         mkTreeM    Main                    103         245    0.0    0.0     0.0    0.0
- CAF                GHC.Conc.Signal          87           0    0.0    0.0     0.0    0.0
- CAF                GHC.IO.Encoding          80           0    0.0    0.0     0.0    0.0
- CAF                GHC.IO.Encoding.Iconv    78           0    0.0    0.0     0.0    0.0
- CAF                GHC.IO.Handle.FD         71           0    0.0    0.0     0.0    0.0
-{% endhighlight %}
-
-We can see that the number of calls to the memomised function `mkTreeM` is
-245, which is the number of unique nodes in the DAG. This compares to 
-26359321, the size of the tree, for the non-memoised function.
-
 **NOTE** It's important to note that the type of memoisation presented here
 is slightly different to what you'd expect if you were memoising functions
 in Python or Ruby. In the Haskell memoisation code above, the memoisation
@@ -697,23 +414,20 @@ only works within recursive calls to the same function. It doesn't work
 across non-recursive calls. So if you're in GHCI and you do the following:
 
 {% highlight text %}
-ghci> treeSize $ mkTree 0
+ghci> treeSize $ gameTree test3x3BoardB (Player 0) True
 26359321
-ghci> treeSize $ mkTree 0
+ghci> treeSize $ gameTree test3x3BoardB (Player 0) True
 26359321
 {% endhighlight %}
 
-Then the second call to `mkTree` isn't "cached" in any way - it goes through
+Then the second call to `gameTree` isn't "cached" in any way - it goes through
 exactly the same process of trying to memoise recursive calls to itself
 starting off with an empty map.
 
-### Applying Memoisation to the Game Tree
+### Fixing a Design Flaw
 
-#### Fixing a Design Flaw
-
-We can use this same memoisation technique for constructing the game tree.
-However, we have a flaw in the way we designed the tree, and this
-will get in the way of memoisation. Recall that the game state is defined by:
+Before we apply memomisation to the game tree creation, we need to fix
+a flaw in the way the tree was designed. Recall that the game state is defined by:
 
 {% highlight haskell %}
 data GameState = GameState {
@@ -731,7 +445,7 @@ However, several different moves from different boards can result in the
 same end state. If we want to memoise the game tree from a possible board, 
 we need to remove the `moveMade` reference and put this into the parent. The 
 game state should only have the current player, the current board, and 
-the list of possible moves from that board.
+the list of possible moves *from* that board.
 
 To do this we're going to put the moves made from a parent node to a child
 node into the parent itself, as an array of moves.
@@ -804,7 +518,7 @@ showGameGraphTree (Node (root, number) children) =
 The code is in DiceOfDoom-i.hs.
 
 
-#### Setting up the Memoising Map
+### Setting up the Memoising Map
 
 In order to memoize the calls to `gameTree` using the method above, we'll 
 need to be able to map a single something to a game tree. The `gametree` 
@@ -859,12 +573,26 @@ gameTreeM f' (board, p, isFirstMove)
                          } (passTree : childTrees)
      where
         possibleMoves = attackMoves board p
+
+type StateMap a b = State (Map.Map a b) b
+ 
+memoizeM :: (Show a, Show b, Ord a) => 
+            ((a -> StateMap a b) -> (a -> StateMap a b)) -> (a -> b)
+memoizeM t x = evalState (f x) Map.empty 
+    where
+        -- Cache miss
+        g z = do
+            y <- t f z  
+            m <- get
+            put $ Map.insert z y m
+            return y
+        -- Cache hit
+        f z = get >>= \m -> maybe (g z) return (Map.lookup z m)
 {% endhighlight %}
 
 Code in DiceOfDoom-k.hs.    -- TODO: rename
 
 Let's test this out on the 1.4 billion-node game tree:
-
 
 {% highlight haskell %}
 main :: IO ()
@@ -877,8 +605,11 @@ main = do
     print t2
     where
         tree = gameTree test3x3BoardE (Player 0) True
+{% endhighlight %}
 
+Running this:
 
+{% highlight text %}
 $ ghc -O2 DiceOfDoom-k.hs
 $ ./DiceOfDoom-k
 2014-10-31 09:21:49.2206886 UTC
@@ -891,7 +622,32 @@ One minute and 40 seconds - that's not bad. Memory usage peaks at 98MB.
 
 ### Memoising the ratings functions
 
-If we try to play the large game above, we're still in trouble:
+We can now play the large game above against another human:
+
+{% highlight haskell %}
+main :: IO ()
+main = do
+    playVsHuman tree 
+    where
+        tree = gameTree test3x3BoardE (Player 0) True
+
+
+$ ghc -O2 DiceOfDoom-m.hs
+Current player: A
+      A-2 A-2 B-2
+    A-3 B-1 A-3
+  A-3 A-3 B-3
+choose your move:
+1: Attack 0 4
+2: Attack 1 4
+3: Attack 3 4
+4: Attack 5 2
+5: Attack 5 4
+6: Attack 7 4
+...
+{% endhighlight %}
+
+However, if we try to play against the computer, we're still in trouble:
 
 {% highlight haskell %}
 main :: IO ()
@@ -913,11 +669,14 @@ see that the various ratings functions are taking up a lot of time. We
 need to memoise these as well.
 
 We can't use the same memoising technique that we used to generate the 
-tree. The `chidlRatings` function does make recursive calls to itself
+tree. The `childRatings` function does make recursive calls to itself
 indirectly via `ratePosition`, but it is called several times independently
-by `handleComputer`. We'd really like to memoise separate calls. The same 
-applies to the `neighbours` function.
+by `handleComputer`. We'd really like to memoise separate calls. 
 
 We'll take the approach used in 
 [Ugly Memoization](http://augustss.blogspot.ie/2011/04/ugly-memoization-heres-problem-that-i.html)
 by Lennart Augustsson.
+
+Q: should we use Data.MemoCombinators?
+
+
