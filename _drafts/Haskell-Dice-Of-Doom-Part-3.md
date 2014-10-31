@@ -918,4 +918,6 @@ indirectly via `ratePosition`, but it is called several times independently
 by `handleComputer`. We'd really like to memoise separate calls. The same 
 applies to the `neighbours` function.
 
-
+We'll take the approach used in 
+[Ugly Memoization](http://augustss.blogspot.ie/2011/04/ugly-memoization-heres-problem-that-i.html)
+by Lennart Augustsson.
