@@ -889,3 +889,33 @@ Depth: 40
 
 One minute and 40 seconds - that's not bad. Memory usage peaks at 98MB.
 
+### Memoising the ratings functions
+
+If we try to play the large game above, we're still in trouble:
+
+{% highlight haskell %}
+main :: IO ()
+main = do
+    playVsComputer (Player 0) tree 
+    where
+        tree = gameTree test3x3BoardE (Player 0) True
+
+$ ghc -O2 DiceOfDoom-m.hs
+Current player: A
+      A-2 A-2 B-2
+    A-3 B-1 A-3
+  A-3 A-3 B-3
+...
+{% endhighlight %}
+
+It hangs for a long time. If we take a look at the profiling info, we can
+see that the various ratings functions are taking up a lot of time. We
+need to memoise these as well.
+
+We can't use the same memoising technique that we used to generate the 
+tree. The `chidlRatings` function does make recursive calls to itself
+indirectly via `ratePosition`, but it is called several times independently
+by `handleComputer`. We'd really like to memoise separate calls. The same 
+applies to the `neighbours` function.
+
+
