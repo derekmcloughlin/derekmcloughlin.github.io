@@ -372,7 +372,7 @@ The profiling output is stored in DiceOfDoom-h.prof.
 
 [test3x3BoardB]({{ site.url }}/images/test3x3BoardB.txt)
 
-[test3x3BoardC](test3x3BoardC.txt)
+[test3x3BoardC]({{ site.url }}/images/test3x3BoardC.txt)
 
 The GC stats are very telling. For `test3x3BoardC` we have:
 
@@ -788,4 +788,8 @@ choose your move:
 1
 ...
 {% endhighlight %}
+
+That's it for part 3. The game is at the same stage as the end of chapter 
+15 in Land of Lisp. In the next part we'll get the game to handle even 
+larger boards.
 
