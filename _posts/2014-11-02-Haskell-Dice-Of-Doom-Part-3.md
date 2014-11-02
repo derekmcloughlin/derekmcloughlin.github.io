@@ -8,6 +8,8 @@ We continue our port of the Land of Lisp game "Dice of Doom" from
 [Part 1](http://derekmcloughlin.github.io/2014/09/13/Haskell-Dice-Of-Doom-Part-1/) 
 and [Part 2](http://derekmcloughlin.github.io/2014/10/04/Haskell-Dice-Of-Doom-Part-2/).
 
+Source code can be found on [Github](https://github.com/derekmcloughlin/DiceOfDoom).
+
 We can now play 2x2 games with no problem. However, trying to play a 3x3 
 game poses a significant challenge for us - it can be very slow.  In this 
 part, we'll take a look at improving the performance of the game for 
