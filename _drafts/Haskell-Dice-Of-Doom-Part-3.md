@@ -133,7 +133,7 @@ main = do
 Then compile with optimisations using the `-O2` flag:
 
 {% highlight haskell %}
-ghc -O2 DiceOfDoom-f.hs
+ghc -O2 DiceOfDoom-h.hs
 {% endhighlight %}
 
 Playing this a few times:
@@ -228,7 +228,7 @@ second call, and the whole tree resides in memory.
 
 ### Aside: Calculating the Size of the Tree
 
-The initial version of `treeSize` flattens the entire tree and then gets it's
+The initial version of `treeSize` flattens the entire tree and then gets its
 length. I thought this would be horribly ineffieicent, but that it would
 do me for a while. After getting an initial set of stats, I resolved to 'fix'
 the issue with `treeSize`:
@@ -321,10 +321,10 @@ For the board with 1.4 billion nodes, the results are interesting
 201861 MISS
 {% endhighlight %}
 
-In other words, of the 1.4 billion nodes, with 472,109 sub-trees,
-only 201,861 had to be computed, which is around one hundreth of a percent 
-of the original value. Even if you play this game in the CLisp REPL, it 
-only takes around 30 seconds for it to generate the game tree.
+In other words, in the tree of 1.4 billion nodes, with 472,109 sub-trees,
+only 201,861 of these sub-trees had to be computed. Even if you play this 
+game in the CLisp REPL, it only takes around 30 seconds for it 
+to generate the game tree.
 
 The Lisp memoization solves our two problems above:
 
@@ -388,7 +388,6 @@ Our goal is to:
 * Reduce the amount of memory used by the tree.
 * Reduce the time taken to construct it.
 
-
 ## Memoising Tree Creation
 
 In languages that allow mutation, memoising is a fairly straightforward
@@ -399,8 +398,9 @@ stores the result for subsequent calls.
 Haskell doesn't allow mutation directly, so we have to use some sort of
 state mechanism. The approach we'll use is described in
 [http://www.maztravel.com/haskell/memofib.html](http://www.maztravel.com/haskell/memofib.html) 
-and
-[Haskell Cafe]( https://groups.google.com/forum/#!topic/comp.lang.haskell/iXA6Wq1SPcU).
+and the
+[comp.lang.haskell]( https://groups.google.com/forum/#!topic/comp.lang.haskell/iXA6Wq1SPcU)
+group.
 
 In some ways the approach is similar to the Lisp one above: we
 have a function that stores calculated values in a map. However, we can't just
@@ -508,15 +508,14 @@ allowedMoves (Node root _) = zip [1..] $ currentMoves root
 
 showGameGraphTree :: Tree (GameState, Int) -> String
 showGameGraphTree (Node (root, number) children) = 
-    concat $ [
-                printf "\"%d\" -> \"%d\" [label=\"%s\";];\n" 
+    concat $ [printf "\"%d\" -> \"%d\" [label=\"%s\";];\n" 
                         number child_number (show moveMade) :: String
-                | (moveMade, (Node (child, child_number) _)) <- zip (currentMoves root) children] ++
-             [showGameGraphTree c | c <- children] 
+                | (moveMade, (Node (child, child_number) _)) 
+                    <- zip (currentMoves root) children]
+             ++ [showGameGraphTree c | c <- children] 
 {% endhighlight %}
 
 The code is in DiceOfDoom-i.hs.
-
 
 ### Setting up the Memoising Map
 
@@ -554,7 +553,8 @@ gameTreeM f' (board, p, isFirstMove)
                  } []
     -- Keeping with the same player, recurse through all moves                                              
     | otherwise = do
-        childTrees <- mapM (\b -> f' (b, p, False)) [makeAMove board p m | m <- possibleMoves] 
+        childTrees <- mapM (\b -> f' (b, p, False)) 
+                           [makeAMove board p m | m <- possibleMoves] 
         if isFirstMove
             then do
                 return $ Node GameState {
@@ -590,7 +590,7 @@ memoizeM t x = evalState (f x) Map.empty
         f z = get >>= \m -> maybe (g z) return (Map.lookup z m)
 {% endhighlight %}
 
-Code in DiceOfDoom-k.hs.    -- TODO: rename
+Code in DiceOfDoom-j.hs
 
 Let's test this out on the 1.4 billion-node game tree:
 
@@ -610,8 +610,8 @@ main = do
 Running this:
 
 {% highlight text %}
-$ ghc -O2 DiceOfDoom-k.hs
-$ ./DiceOfDoom-k
+$ ghc -O2 DiceOfDoom-j.hs
+$ ./DiceOfDoom-j
 2014-10-31 09:21:49.2206886 UTC
 Size: 1468919491
 Depth: 40
@@ -619,6 +619,8 @@ Depth: 40
 {% endhighlight %}
 
 One minute and 40 seconds - that's not bad. Memory usage peaks at 98MB.
+
+TODO: show profiling info + GC stats.
 
 ### Memoising the ratings functions
 
@@ -632,7 +634,7 @@ main = do
         tree = gameTree test3x3BoardE (Player 0) True
 
 
-$ ghc -O2 DiceOfDoom-m.hs
+$ ghc -O2 DiceOfDoom-j.hs
 Current player: A
       A-2 A-2 B-2
     A-3 B-1 A-3
@@ -656,7 +658,7 @@ main = do
     where
         tree = gameTree test3x3BoardE (Player 0) True
 
-$ ghc -O2 DiceOfDoom-m.hs
+$ ghc -O2 DiceOfDoom-k.hs
 Current player: A
       A-2 A-2 B-2
     A-3 B-1 A-3
@@ -675,8 +677,58 @@ by `handleComputer`. We'd really like to memoise separate calls.
 
 We'll take the approach used in 
 [Ugly Memoization](http://augustss.blogspot.ie/2011/04/ugly-memoization-heres-problem-that-i.html)
-by Lennart Augustsson.
+by Lennart Augustsson. It uses unsafe IO and MVars. 
 
-Q: should we use Data.MemoCombinators?
+{% highlight haskell %}
+childRatingsM :: Tree GameState -> GameState -> Player -> [Double]
+childRatingsM (Node _ children) _ nodePlayer = 
+    [ratePosition c nodePlayer | c <- children]
 
+childRatings :: Tree GameState -> Player -> [Double]
+childRatings tree@(Node root _) p = memo childRatingsM tree root p
+
+memo :: (Show b, Ord b, Ord c) => (a -> b -> c -> d) -> (a -> b -> c -> d)
+memo f = let f' = unsafePerformIO (memoIO f) in \ x y z -> unsafePerformIO (f' x y z)
+
+memoIO :: (Ord b, Ord c) => (a -> b -> c -> d) -> IO (a -> b -> c -> IO d)
+memoIO f = do
+    v <- newMVar Map.empty
+    let f' x y z = do
+        m <- readMVar v
+        case Map.lookup (y, z) m of
+            Nothing -> do 
+                let r = f x y z
+                n <- takeMVar v
+                putMVar v (Map.insert (y, z) r n)
+                return r
+            Just r -> 
+                return r
+    return f'
+{% endhighlight %}
+
+The `childRatings` function takes a game tree and a player. However, we only
+need to memoise the root of the tree and the player, so the `childRatingsM` 
+function takes the root as a parameter but does nothing with it.
+
+Code in DiceOfDoom-k.hs.
+
+With this in place, we can now play against the computer:
+
+{% highlight text %}
+$ ghc -O2 DiceOfDoom-k.hs
+$ ./DiceOfDoom-k
+Current player: A
+      A-2 A-2 B-2
+    A-3 B-1 A-3
+  A-3 A-3 B-3
+choose your move:
+1: Attack 0 4
+2: Attack 1 4
+3: Attack 3 4
+4: Attack 5 2
+5: Attack 5 4
+6: Attack 7 4
+1
+...
+{% endhighlight %}
 
