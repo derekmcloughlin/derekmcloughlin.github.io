@@ -125,14 +125,14 @@ main :: IO ()
 main = do
     t1 <- getCurrentTime
     print t1
-    boardStats test3x3BoardB 
+    playRandom3x3Board 
     t2 <- getCurrentTime
     print t2
 {% endhighlight %}
 
 Then compile with optimisations using the `-O2` flag:
 
-{% highlight haskell %}
+{% highlight text %}
 ghc -O2 DiceOfDoom-h.hs
 {% endhighlight %}
 
@@ -356,7 +356,7 @@ a real idea of where the bottlenecks lie by profiling it.
 
 GHC allows us to turn on profiling:
 
-{% highlight haskell %}
+{% highlight text %}
 ghc -O2 -prof -auto-all DiceOfDoom-h.hs
 {% endhighlight %}
 
@@ -364,8 +364,8 @@ To run, we need to tell the GHC runtime that we want do do the profiling (-p)
 and that we want garbage collection stats as well (-s):
 (This test was done using test3x3BoardB)
 
-{% highlight haskell %}
-./DiceOfDoom-h +RTS -p
+{% highlight text %}
+./DiceOfDoom-h +RTS -p -s
 {% endhighlight %}
 
 The profiling output is stored in DiceOfDoom-h.prof.
@@ -374,19 +374,40 @@ The profiling output is stored in DiceOfDoom-h.prof.
 
 [test3x3BoardC](test3x3BoardC.txt)
 
-TODO: Add the GC stats.
+The GC stats are very telling. For `test3x3BoardC` we have:
+
+{% highlight text %}
+ 112,814,519,176 bytes allocated in the heap
+  17,082,086,768 bytes copied during GC
+   2,771,996,128 bytes maximum residency (17 sample(s))
+      50,573,008 bytes maximum slop
+            7803 MB total memory in use (0 MB lost due to fragmentation)
+
+                                    Tot time (elapsed)  Avg pause  Max pause
+  Gen  0     218297 colls,     0 par   14.70s   20.17s     0.0001s    0.1349s
+  Gen  1        17 colls,     0 par   14.46s   44.15s     2.5968s    21.5761s
+
+  INIT    time    0.00s  (  0.00s elapsed)
+  MUT     time  116.08s  (135.91s elapsed)
+  GC      time   29.16s  ( 64.31s elapsed)
+  RP      time    0.00s  (  0.00s elapsed)
+  PROF    time    0.00s  (  0.00s elapsed)
+  EXIT    time    0.10s  (  1.50s elapsed)
+  Total   time  145.35s  (201.72s elapsed)
+
+  %GC     time      20.1%  (31.9% elapsed)
+
+  Alloc rate    971,852,043 bytes per MUT second
+
+  Productivity  79.9% of total user, 57.6% of total elapsed
+{% endhighlight %}
+
+There's a lot of GC going on - which shouldn't be a surprise as the game
+trees have millions of nodes.
 
 For info on the interpretation of GC stats, see 
 [Running a compiled program](http://www.haskell.org/ghc/docs/7.8.3/html/users_guide/runtime-control.html)
 in the GHC docs.
-
-The program takes up a lot of memory (several GB), and there's a lot 
-of garbage collection going on.
-
-Our goal is to:
-
-* Reduce the amount of memory used by the tree.
-* Reduce the time taken to construct it.
 
 ## Memoising Tree Creation
 
@@ -398,7 +419,7 @@ stores the result for subsequent calls.
 Haskell doesn't allow mutation directly, so we have to use some sort of
 state mechanism. The approach we'll use is described in
 [http://www.maztravel.com/haskell/memofib.html](http://www.maztravel.com/haskell/memofib.html) 
-and the
+and in a thread on the
 [comp.lang.haskell]( https://groups.google.com/forum/#!topic/comp.lang.haskell/iXA6Wq1SPcU)
 group.
 
@@ -422,7 +443,8 @@ ghci> treeSize $ gameTree test3x3BoardB (Player 0) True
 
 Then the second call to `gameTree` isn't "cached" in any way - it goes through
 exactly the same process of trying to memoise recursive calls to itself
-starting off with an empty map.
+starting off with an empty map. We'll see an example of memoising that can do
+this when we memoise the calls to get the ratings.
 
 ### Fixing a Design Flaw
 
@@ -536,16 +558,16 @@ gameTreeM :: Monad m =>
 gameTreeM f' (board, p, isFirstMove)
     -- No further moves possible. Switch players and add the reinforcements
     | null possibleMoves && not isFirstMove = do
-            passTree <- f' ((reinforce board p),    -- Add reinforcements
-                             (nextPlayer board p),  -- Switch player
-                             True)                  -- First move for new player
+            passTree <- f' (reinforce board p,    -- Add reinforcements
+                            nextPlayer board p,   -- Switch player
+                            True)                 -- First move for new player
             return $ Node GameState {
                     currentPlayer = p,
                     currentMoves = [Pass],
                     currentBoard = board
                  } [passTree]
     --  No moves possible - END OF GAME
-    | null possibleMoves && isFirstMove = do
+    | null possibleMoves && isFirstMove =
             return $ Node GameState {
                     currentPlayer = p,
                     currentMoves = [Pass],
@@ -556,16 +578,16 @@ gameTreeM f' (board, p, isFirstMove)
         childTrees <- mapM (\b -> f' (b, p, False)) 
                            [makeAMove board p m | m <- possibleMoves] 
         if isFirstMove
-            then do
+            then
                 return $ Node GameState {
                             currentPlayer = p,
                             currentMoves = possibleMoves,
                             currentBoard = board
-                         } (childTrees)
+                         } childTrees
             else do
-                passTree <- f' ((reinforce board p),    -- Add reinforcements
-                                 (nextPlayer board p),  -- Switch player
-                                 True)                  -- First move for new player
+                passTree <- f' (reinforce board p,  -- Add reinforcements
+                                nextPlayer board p, -- Switch player
+                                True)               -- First move for new player
                 return $ Node GameState {
                             currentPlayer = p,
                             currentMoves = Pass : possibleMoves,
@@ -573,6 +595,7 @@ gameTreeM f' (board, p, isFirstMove)
                          } (passTree : childTrees)
      where
         possibleMoves = attackMoves board p
+
 
 type StateMap a b = State (Map.Map a b) b
  
@@ -610,17 +633,48 @@ main = do
 Running this:
 
 {% highlight text %}
-$ ghc -O2 DiceOfDoom-j.hs
-$ ./DiceOfDoom-j
-2014-10-31 09:21:49.2206886 UTC
+ghc -O2 DiceOfDoom-j.hs
+./DiceOfDoom-j
+2014-11-01 09:21:49.2206886 UTC
 Size: 1468919491
 Depth: 40
-2014-10-31 09:23:28.837608 UTC
+2014-11-01 09:23:28.837608 UTC
 {% endhighlight %}
 
-One minute and 40 seconds - that's not bad. Memory usage peaks at 98MB.
+One minute and 40 seconds - that's not bad. Memory usage peaks at 145MB.
 
-TODO: show profiling info + GC stats.
+If we profile this, and look at the GC stats for `test3x3BoardC`
+
+{% highlight text %}
+ghc -O2 -prof -auto-all DiceOfDoom-j.hs
+./DiceOfDoom-j +RTS -p -s
+  34,575,453,936 bytes allocated in the heap
+   4,376,663,592 bytes copied during GC
+     146,595,568 bytes maximum residency (35 sample(s))
+       3,292,400 bytes maximum slop
+             425 MB total memory in use (0 MB lost due to fragmentation)
+
+                                    Tot time (elapsed)  Avg pause  Max pause
+  Gen  0     66920 colls,     0 par    2.86s    3.07s     0.0000s    0.0376s
+  Gen  1        35 colls,     0 par    3.01s    3.75s     0.1073s    0.2740s
+
+  INIT    time    0.00s  (  0.00s elapsed)
+  MUT     time   21.64s  ( 22.14s elapsed)
+  GC      time    5.88s  (  6.82s elapsed)
+  RP      time    0.00s  (  0.00s elapsed)
+  PROF    time    0.00s  (  0.00s elapsed)
+  EXIT    time    0.00s  (  0.07s elapsed)
+  Total   time   27.52s  ( 29.04s elapsed)
+
+  %GC     time      21.4%  (23.5% elapsed)
+
+  Alloc rate    1,597,733,984 bytes per MUT second
+
+  Productivity  78.6% of total user, 74.5% of total elapsed
+{% endhighlight %}
+
+There's a lot less GC going on, and the total memory in use has gone
+down from 7.8 GB to 425 MB.
 
 ### Memoising the ratings functions
 
@@ -632,8 +686,9 @@ main = do
     playVsHuman tree 
     where
         tree = gameTree test3x3BoardE (Player 0) True
+{% endhighlight %}
 
-
+{% highlight text %}
 $ ghc -O2 DiceOfDoom-j.hs
 Current player: A
       A-2 A-2 B-2
@@ -657,7 +712,9 @@ main = do
     playVsComputer (Player 0) tree 
     where
         tree = gameTree test3x3BoardE (Player 0) True
+{% endhighlight %}
 
+{% highlight text %}
 $ ghc -O2 DiceOfDoom-k.hs
 Current player: A
       A-2 A-2 B-2
@@ -715,8 +772,8 @@ Code in DiceOfDoom-k.hs.
 With this in place, we can now play against the computer:
 
 {% highlight text %}
-$ ghc -O2 DiceOfDoom-k.hs
-$ ./DiceOfDoom-k
+ghc -O2 DiceOfDoom-k.hs
+./DiceOfDoom-k
 Current player: A
       A-2 A-2 B-2
     A-3 B-1 A-3
