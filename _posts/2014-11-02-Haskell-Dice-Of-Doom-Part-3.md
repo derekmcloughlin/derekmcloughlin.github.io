@@ -275,7 +275,8 @@ occur multiple times within the tree.
 
 Let's see an example of this. The game tree used in Part 2 is a good example:
 
-<img src="{{ site.url }}/images/test2x2BoardC-shared.svg" alt="Drawing" style="width: 900px;"/>
+<object type="image/svg+xml" data="{{ site.url }}/images/test2x2BoardC-shared.svg" style="width: 900px;">Your browser does not support SVG</object>
+
 
 The shared nodes are coloured in various shades of yellow.
 
