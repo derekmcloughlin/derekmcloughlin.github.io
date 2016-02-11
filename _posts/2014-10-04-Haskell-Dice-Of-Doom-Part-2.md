@@ -402,7 +402,7 @@ The board is much more evenly balanced. If we look at the game tree where
 player A starts, we see that all three winning combinations are possible for
 both players:
 
-<img src="{{ site.url }}/images/test2x2BoardC.svg" alt="Drawing" style="width: 900px;"/>
+<object type="image/svg+xml" data="{{ site.url }}/images/test2x2BoardC.svg" style="width: 900px;">Your browser does not support SVG</object>
 
 (Right-click to open in a new tab to see a full scale SVG).
 
