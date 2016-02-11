@@ -341,7 +341,7 @@ ghci> makeGraphvizFile gt "test2x2board"
 
 You should see this when you open the SVG file:
 
-<img src="{{ site.url }}/images/test2x2board.svg" alt="test2x2board" style="width: 900px;"/>
+<object type="image/svg+xml" data="{{ site.url }}/images/test2x2board.svg" style="width: 900px;">Your browser does not support SVG</object>
 
 ## Fixing A Bug
 
